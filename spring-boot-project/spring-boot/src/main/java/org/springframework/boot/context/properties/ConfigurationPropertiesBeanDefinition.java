@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,55 +16,32 @@
 
 package org.springframework.boot.context.properties;
 
-import java.lang.annotation.Annotation;
-import java.util.function.Supplier;
-
 import org.springframework.beans.factory.config.BeanDefinition;
-import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.GenericBeanDefinition;
-import org.springframework.boot.context.properties.bind.Bindable;
-import org.springframework.core.annotation.AnnotationUtils;
-import org.springframework.validation.annotation.Validated;
+import org.springframework.core.Conventions;
+import org.springframework.core.annotation.MergedAnnotation;
 
 /**
  * {@link BeanDefinition} that is used for registering
- * {@link ConfigurationProperties @ConfigurationProperties} beans that are bound at
- * creation time.
+ * {@link ConfigurationProperties @ConfigurationProperties} beans.
  *
- * @author Stephane Nicoll
- * @author Madhura Bhave
+ * @author Phillip Webb
  */
-final class ConfigurationPropertiesBeanDefinition extends GenericBeanDefinition {
+class ConfigurationPropertiesBeanDefinition extends GenericBeanDefinition {
 
-	static ConfigurationPropertiesBeanDefinition from(ConfigurableListableBeanFactory beanFactory, String beanName,
-			Class<?> type) {
-		ConfigurationPropertiesBeanDefinition beanDefinition = new ConfigurationPropertiesBeanDefinition();
-		beanDefinition.setBeanClass(type);
-		beanDefinition.setInstanceSupplier(createBean(beanFactory, beanName, type));
-		return beanDefinition;
+	private static final String ANNOTATION_ATTRIBUTE = Conventions
+			.getQualifiedAttributeName(ConfigurationPropertiesBeanDefinition.class, "annotation");
+
+	ConfigurationPropertiesBeanDefinition(Class<?> beanClass, MergedAnnotation<ConfigurationProperties> annotation) {
+		setBeanClass(beanClass);
+		setAttribute(ANNOTATION_ATTRIBUTE, annotation);
 	}
 
-	private static <T> Supplier<T> createBean(ConfigurableListableBeanFactory beanFactory, String beanName,
-			Class<T> type) {
-		return () -> {
-			ConfigurationProperties annotation = getAnnotation(type, ConfigurationProperties.class);
-			Validated validated = getAnnotation(type, Validated.class);
-			Annotation[] annotations = (validated != null) ? new Annotation[] { annotation, validated }
-					: new Annotation[] { annotation };
-			Bindable<T> bindable = Bindable.of(type).withAnnotations(annotations);
-			ConfigurationPropertiesBinder binder = beanFactory.getBean(ConfigurationPropertiesBinder.BEAN_NAME,
-					ConfigurationPropertiesBinder.class);
-			try {
-				return binder.bindOrCreate(bindable);
-			}
-			catch (Exception ex) {
-				throw new ConfigurationPropertiesBindException(beanName, type, annotation, ex);
-			}
-		};
-	}
-
-	private static <A extends Annotation> A getAnnotation(Class<?> type, Class<A> annotationType) {
-		return AnnotationUtils.findAnnotation(type, annotationType);
+	@SuppressWarnings("unchecked")
+	static MergedAnnotation<ConfigurationProperties> getAnnotation(BeanDefinition beanDefinition) {
+		MergedAnnotation<ConfigurationProperties> annotation = (beanDefinition != null)
+				? (MergedAnnotation<ConfigurationProperties>) beanDefinition.getAttribute(ANNOTATION_ATTRIBUTE) : null;
+		return (annotation != null) ? annotation : MergedAnnotation.missing();
 	}
 
 }

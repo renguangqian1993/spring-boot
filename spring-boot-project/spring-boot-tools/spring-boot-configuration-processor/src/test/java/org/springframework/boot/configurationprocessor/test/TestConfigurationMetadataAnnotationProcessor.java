@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,11 +47,19 @@ public class TestConfigurationMetadataAnnotationProcessor extends ConfigurationM
 
 	public static final String DEPRECATED_CONFIGURATION_PROPERTY_ANNOTATION = "org.springframework.boot.configurationsample.DeprecatedConfigurationProperty";
 
+	public static final String CONSTRUCTOR_BINDING_ANNOTATION = "org.springframework.boot.configurationsample.ConstructorBinding";
+
 	public static final String DEFAULT_VALUE_ANNOTATION = "org.springframework.boot.configurationsample.DefaultValue";
 
 	public static final String ENDPOINT_ANNOTATION = "org.springframework.boot.configurationsample.Endpoint";
 
 	public static final String READ_OPERATION_ANNOTATION = "org.springframework.boot.configurationsample.ReadOperation";
+
+	public static final String NAME_ANNOTATION = "org.springframework.boot.configurationsample.Name";
+
+	public static final String IMPORT_CONFIGURATION_PROPERTIES_BEAN_ANNOATION = "org.springframework.boot.configurationsample.ImportConfigurationPropertiesBean";
+
+	public static final String IMPORT_CONFIGURATION_PROPERTIES_BEANS_ANNOATION = "org.springframework.boot.configurationsample.ImportConfigurationPropertiesBeans";
 
 	private ConfigurationMetadata metadata;
 
@@ -77,6 +85,11 @@ public class TestConfigurationMetadataAnnotationProcessor extends ConfigurationM
 	}
 
 	@Override
+	protected String constructorBindingAnnotation() {
+		return CONSTRUCTOR_BINDING_ANNOTATION;
+	}
+
+	@Override
 	protected String defaultValueAnnotation() {
 		return DEFAULT_VALUE_ANNOTATION;
 	}
@@ -89,6 +102,21 @@ public class TestConfigurationMetadataAnnotationProcessor extends ConfigurationM
 	@Override
 	protected String readOperationAnnotation() {
 		return READ_OPERATION_ANNOTATION;
+	}
+
+	@Override
+	protected String nameAnnotation() {
+		return NAME_ANNOTATION;
+	}
+
+	@Override
+	protected String importConfigurationPropertiesBeanAnnotation() {
+		return IMPORT_CONFIGURATION_PROPERTIES_BEAN_ANNOATION;
+	}
+
+	@Override
+	protected String importConfigurationPropertiesBeansAnnotation() {
+		return IMPORT_CONFIGURATION_PROPERTIES_BEANS_ANNOATION;
 	}
 
 	@Override

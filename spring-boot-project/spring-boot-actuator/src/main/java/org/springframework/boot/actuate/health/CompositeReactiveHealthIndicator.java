@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,7 +30,9 @@ import reactor.util.function.Tuple2;
  *
  * @author Stephane Nicoll
  * @since 2.0.0
+ * @deprecated since 2.2.0 in favor of a {@link CompositeReactiveHealthContributor}
  */
+@Deprecated
 public class CompositeReactiveHealthIndicator implements ReactiveHealthIndicator {
 
 	private final ReactiveHealthIndicatorRegistry registry;

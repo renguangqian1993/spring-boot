@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@
 package org.springframework.boot.autoconfigure.web.servlet.error;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Date;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -81,6 +80,7 @@ import org.springframework.web.util.HtmlUtils;
  * @author Andy Wilkinson
  * @author Stephane Nicoll
  * @author Brian Clozel
+ * @author Scott Frederick
  * @since 1.0.0
  */
 @Configuration(proxyBeanMethods = false)
@@ -100,7 +100,7 @@ public class ErrorMvcAutoConfiguration {
 	@Bean
 	@ConditionalOnMissingBean(value = ErrorAttributes.class, search = SearchStrategy.CURRENT)
 	public DefaultErrorAttributes errorAttributes() {
-		return new DefaultErrorAttributes(this.serverProperties.getError().isIncludeException());
+		return new DefaultErrorAttributes();
 	}
 
 	@Bean
@@ -136,7 +136,7 @@ public class ErrorMvcAutoConfiguration {
 
 		@Bean
 		@ConditionalOnBean(DispatcherServlet.class)
-		@ConditionalOnMissingBean
+		@ConditionalOnMissingBean(ErrorViewResolver.class)
 		DefaultErrorViewResolver conventionErrorViewResolver() {
 			return new DefaultErrorViewResolver(this.applicationContext, this.resourceProperties);
 		}
@@ -206,7 +206,7 @@ public class ErrorMvcAutoConfiguration {
 			}
 			response.setContentType(TEXT_HTML_UTF8.toString());
 			StringBuilder builder = new StringBuilder();
-			Date timestamp = (Date) model.get("timestamp");
+			Object timestamp = model.get("timestamp");
 			Object message = model.get("message");
 			Object trace = model.get("trace");
 			if (response.getContentType() == null) {
@@ -252,7 +252,7 @@ public class ErrorMvcAutoConfiguration {
 	/**
 	 * {@link WebServerFactoryCustomizer} that configures the server's error pages.
 	 */
-	private static class ErrorPageCustomizer implements ErrorPageRegistrar, Ordered {
+	static class ErrorPageCustomizer implements ErrorPageRegistrar, Ordered {
 
 		private final ServerProperties properties;
 

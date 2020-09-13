@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,7 +65,7 @@ import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
  */
 class JooqAutoConfigurationTests {
 
-	private ApplicationContextRunner contextRunner = new ApplicationContextRunner()
+	private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
 			.withConfiguration(AutoConfigurations.of(JooqAutoConfiguration.class))
 			.withPropertyValues("spring.datasource.name:jooqtest");
 
@@ -122,13 +122,13 @@ class JooqAutoConfigurationTests {
 					assertThat(dsl.configuration().recordUnmapperProvider().getClass())
 							.isEqualTo(TestRecordUnmapperProvider.class);
 					assertThat(dsl.configuration().executorProvider().getClass()).isEqualTo(TestExecutorProvider.class);
-					assertThat(dsl.configuration().recordListenerProviders().length).isEqualTo(1);
+					assertThat(dsl.configuration().recordListenerProviders()).hasSize(1);
 					ExecuteListenerProvider[] executeListenerProviders = dsl.configuration().executeListenerProviders();
-					assertThat(executeListenerProviders.length).isEqualTo(2);
+					assertThat(executeListenerProviders).hasSize(2);
 					assertThat(executeListenerProviders[0]).isInstanceOf(DefaultExecuteListenerProvider.class);
 					assertThat(executeListenerProviders[1]).isInstanceOf(TestExecuteListenerProvider.class);
-					assertThat(dsl.configuration().visitListenerProviders().length).isEqualTo(1);
-					assertThat(dsl.configuration().transactionListenerProviders().length).isEqualTo(1);
+					assertThat(dsl.configuration().visitListenerProviders()).hasSize(1);
+					assertThat(dsl.configuration().transactionListenerProviders()).hasSize(1);
 				});
 	}
 

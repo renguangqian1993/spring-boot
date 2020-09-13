@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package org.springframework.boot.autoconfigure.security.oauth2.resource.servlet;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.security.oauth2.resource.OAuth2ResourceServerProperties;
@@ -24,13 +25,14 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.annotation.web.configurers.oauth2.server.resource.OAuth2ResourceServerConfigurer;
-import org.springframework.security.oauth2.server.resource.introspection.NimbusOAuth2TokenIntrospectionClient;
-import org.springframework.security.oauth2.server.resource.introspection.OAuth2TokenIntrospectionClient;
+import org.springframework.security.oauth2.server.resource.introspection.NimbusOpaqueTokenIntrospector;
+import org.springframework.security.oauth2.server.resource.introspection.OpaqueTokenIntrospector;
+import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * Configures a {@link OAuth2TokenIntrospectionClient} when a token introspection endpoint
- * is available. Also configures a {@link WebSecurityConfigurerAdapter} if a
- * {@link OAuth2TokenIntrospectionClient} bean is found.
+ * Configures a {@link OpaqueTokenIntrospector} when a token introspection endpoint is
+ * available. Also configures a {@link WebSecurityConfigurerAdapter} if a
+ * {@link OpaqueTokenIntrospector} bean is found.
  *
  * @author Madhura Bhave
  */
@@ -38,25 +40,26 @@ import org.springframework.security.oauth2.server.resource.introspection.OAuth2T
 class OAuth2ResourceServerOpaqueTokenConfiguration {
 
 	@Configuration(proxyBeanMethods = false)
-	@ConditionalOnMissingBean(OAuth2TokenIntrospectionClient.class)
+	@ConditionalOnMissingBean(OpaqueTokenIntrospector.class)
 	static class OpaqueTokenIntrospectionClientConfiguration {
 
 		@Bean
 		@ConditionalOnProperty(name = "spring.security.oauth2.resourceserver.opaquetoken.introspection-uri")
-		NimbusOAuth2TokenIntrospectionClient oAuth2TokenIntrospectionClient(OAuth2ResourceServerProperties properties) {
+		NimbusOpaqueTokenIntrospector opaqueTokenIntrospector(OAuth2ResourceServerProperties properties) {
 			OAuth2ResourceServerProperties.Opaquetoken opaqueToken = properties.getOpaquetoken();
-			return new NimbusOAuth2TokenIntrospectionClient(opaqueToken.getIntrospectionUri(),
-					opaqueToken.getClientId(), opaqueToken.getClientSecret());
+			return new NimbusOpaqueTokenIntrospector(opaqueToken.getIntrospectionUri(), opaqueToken.getClientId(),
+					opaqueToken.getClientSecret());
 		}
 
 	}
 
 	@Configuration(proxyBeanMethods = false)
-	@ConditionalOnMissingBean(WebSecurityConfigurerAdapter.class)
+	@ConditionalOnClass({ SecurityFilterChain.class, WebSecurityConfigurerAdapter.class })
+	@ConditionalOnMissingBean({ WebSecurityConfigurerAdapter.class, SecurityFilterChain.class })
 	static class OAuth2WebSecurityConfigurerAdapter {
 
 		@Bean
-		@ConditionalOnBean(OAuth2TokenIntrospectionClient.class)
+		@ConditionalOnBean(OpaqueTokenIntrospector.class)
 		WebSecurityConfigurerAdapter opaqueTokenWebSecurityConfigurerAdapter() {
 			return new WebSecurityConfigurerAdapter() {
 

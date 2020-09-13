@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,9 +35,13 @@ class MetadataGenerationEnvironmentFactory implements Function<ProcessingEnviron
 				TestConfigurationMetadataAnnotationProcessor.CONFIGURATION_PROPERTIES_ANNOTATION,
 				TestConfigurationMetadataAnnotationProcessor.NESTED_CONFIGURATION_PROPERTY_ANNOTATION,
 				TestConfigurationMetadataAnnotationProcessor.DEPRECATED_CONFIGURATION_PROPERTY_ANNOTATION,
+				TestConfigurationMetadataAnnotationProcessor.CONSTRUCTOR_BINDING_ANNOTATION,
 				TestConfigurationMetadataAnnotationProcessor.DEFAULT_VALUE_ANNOTATION,
 				TestConfigurationMetadataAnnotationProcessor.ENDPOINT_ANNOTATION,
-				TestConfigurationMetadataAnnotationProcessor.READ_OPERATION_ANNOTATION);
+				TestConfigurationMetadataAnnotationProcessor.READ_OPERATION_ANNOTATION,
+				TestConfigurationMetadataAnnotationProcessor.NAME_ANNOTATION,
+				TestConfigurationMetadataAnnotationProcessor.IMPORT_CONFIGURATION_PROPERTIES_BEAN_ANNOATION,
+				TestConfigurationMetadataAnnotationProcessor.IMPORT_CONFIGURATION_PROPERTIES_BEANS_ANNOATION);
 	}
 
 }

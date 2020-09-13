@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2020 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,6 +29,8 @@ import org.springframework.boot.actuate.env.EnvironmentEndpoint.PropertySourceDe
 import org.springframework.boot.actuate.env.EnvironmentEndpoint.PropertySourceEntryDescriptor;
 import org.springframework.boot.actuate.env.EnvironmentEndpoint.PropertyValueDescriptor;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.origin.Origin;
+import org.springframework.boot.origin.OriginLookup;
 import org.springframework.boot.test.util.TestPropertyValues;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -37,6 +39,7 @@ import org.springframework.core.env.ConfigurableEnvironment;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.StandardEnvironment;
+import org.springframework.mock.env.MockPropertySource;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -49,6 +52,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * @author Stephane Nicoll
  * @author Madhura Bhave
  * @author Andy Wilkinson
+ * @author HaiTao Zhang
+ * @author Chris Bono
  */
 class EnvironmentEndpointTests {
 
@@ -221,6 +226,18 @@ class EnvironmentEndpointTests {
 	}
 
 	@Test
+	void originAndOriginParents() {
+		StandardEnvironment environment = new StandardEnvironment();
+		OriginParentMockPropertySource propertySource = new OriginParentMockPropertySource();
+		propertySource.setProperty("name", "test");
+		environment.getPropertySources().addFirst(propertySource);
+		EnvironmentEntryDescriptor descriptor = new EnvironmentEndpoint(environment).environmentEntry("name");
+		PropertySourceEntryDescriptor entryDescriptor = propertySources(descriptor).get("mockProperties");
+		assertThat(entryDescriptor.getProperty().getOrigin()).isEqualTo("name");
+		assertThat(entryDescriptor.getProperty().getOriginParents()).containsExactly("spring", "boot");
+	}
+
+	@Test
 	void propertyEntryNotFound() {
 		ConfigurableEnvironment environment = emptyEnvironment();
 		environment.getPropertySources().addFirst(singleKeyPropertySource("test", "foo", "bar"));
@@ -242,6 +259,26 @@ class EnvironmentEndpointTests {
 		assertThat(sources.keySet()).containsExactly("two", "one");
 		assertThat(sources.get("one").getProperties().get("a").getValue()).isEqualTo("alpha");
 		assertThat(sources.get("two").getProperties().get("a").getValue()).isEqualTo("apple");
+	}
+
+	@Test
+	void uriPropertyWithSensitiveInfo() {
+		ConfigurableEnvironment environment = new StandardEnvironment();
+		TestPropertyValues.of("sensitive.uri=http://user:password@localhost:8080").applyTo(environment);
+		EnvironmentEntryDescriptor descriptor = new EnvironmentEndpoint(environment).environmentEntry("sensitive.uri");
+		assertThat(descriptor.getProperty().getValue()).isEqualTo("http://user:******@localhost:8080");
+	}
+
+	@Test
+	void addressesPropertyWithMultipleEntriesEachWithSensitiveInfo() {
+		ConfigurableEnvironment environment = new StandardEnvironment();
+		TestPropertyValues
+				.of("sensitive.addresses=http://user:password@localhost:8080,http://user2:password2@localhost:8082")
+				.applyTo(environment);
+		EnvironmentEntryDescriptor descriptor = new EnvironmentEndpoint(environment)
+				.environmentEntry("sensitive.addresses");
+		assertThat(descriptor.getProperty().getValue())
+				.isEqualTo("http://user:******@localhost:8080,http://user2:******@localhost:8082");
 	}
 
 	private static ConfigurableEnvironment emptyEnvironment() {
@@ -276,6 +313,38 @@ class EnvironmentEndpointTests {
 		}
 		else {
 			assertThat(actual.getProperty()).isNull();
+		}
+
+	}
+
+	static class OriginParentMockPropertySource extends MockPropertySource implements OriginLookup<String> {
+
+		@Override
+		public Origin getOrigin(String key) {
+			return new MockOrigin(key, new MockOrigin("spring", new MockOrigin("boot", null)));
+		}
+
+	}
+
+	static class MockOrigin implements Origin {
+
+		private final String value;
+
+		private final MockOrigin parent;
+
+		MockOrigin(String value, MockOrigin parent) {
+			this.value = value;
+			this.parent = parent;
+		}
+
+		@Override
+		public Origin getParent() {
+			return this.parent;
+		}
+
+		@Override
+		public String toString() {
+			return this.value;
 		}
 
 	}

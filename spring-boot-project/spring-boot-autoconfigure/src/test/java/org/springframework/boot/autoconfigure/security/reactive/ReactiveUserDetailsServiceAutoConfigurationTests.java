@@ -21,13 +21,17 @@ import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
 import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.rsocket.RSocketMessagingAutoConfiguration;
+import org.springframework.boot.autoconfigure.rsocket.RSocketStrategiesAutoConfiguration;
 import org.springframework.boot.autoconfigure.security.SecurityProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.test.context.runner.ReactiveWebApplicationContextRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.security.authentication.ReactiveAuthenticationManager;
+import org.springframework.security.config.annotation.rsocket.EnableRSocketSecurity;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.core.userdetails.MapReactiveUserDetailsService;
 import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
@@ -35,7 +39,7 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
-import org.springframework.security.oauth2.server.resource.introspection.ReactiveOAuth2TokenIntrospectionClient;
+import org.springframework.security.oauth2.server.resource.introspection.ReactiveOpaqueTokenIntrospector;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -57,6 +61,17 @@ class ReactiveUserDetailsServiceAutoConfigurationTests {
 			ReactiveUserDetailsService userDetailsService = context.getBean(ReactiveUserDetailsService.class);
 			assertThat(userDetailsService.findByUsername("user").block(Duration.ofSeconds(30))).isNotNull();
 		});
+	}
+
+	@Test
+	void userDetailsServiceWhenRSocketConfigured() {
+		new ApplicationContextRunner()
+				.withConfiguration(AutoConfigurations.of(ReactiveUserDetailsServiceAutoConfiguration.class,
+						RSocketMessagingAutoConfiguration.class, RSocketStrategiesAutoConfiguration.class))
+				.withUserConfiguration(TestRSocketSecurityConfiguration.class).run((context) -> {
+					ReactiveUserDetailsService userDetailsService = context.getBean(ReactiveUserDetailsService.class);
+					assertThat(userDetailsService.findByUsername("user").block(Duration.ofSeconds(30))).isNotNull();
+				});
 	}
 
 	@Test
@@ -86,11 +101,10 @@ class ReactiveUserDetailsServiceAutoConfigurationTests {
 
 	@Test
 	void doesNotConfigureDefaultUserIfResourceServerWithOpaqueIsUsed() {
-		this.contextRunner.withUserConfiguration(ReactiveOAuth2TokenIntrospectionClientConfiguration.class)
-				.run((context) -> {
-					assertThat(context).hasSingleBean(ReactiveOAuth2TokenIntrospectionClient.class);
-					assertThat(context).doesNotHaveBean(ReactiveUserDetailsService.class);
-				});
+		this.contextRunner.withUserConfiguration(ReactiveOpaqueTokenIntrospectorConfiguration.class).run((context) -> {
+			assertThat(context).hasSingleBean(ReactiveOpaqueTokenIntrospector.class);
+			assertThat(context).doesNotHaveBean(ReactiveUserDetailsService.class);
+		});
 	}
 
 	@Test
@@ -133,6 +147,13 @@ class ReactiveUserDetailsServiceAutoConfigurationTests {
 	@EnableWebFluxSecurity
 	@EnableConfigurationProperties(SecurityProperties.class)
 	static class TestSecurityConfiguration {
+
+	}
+
+	@Configuration(proxyBeanMethods = false)
+	@EnableRSocketSecurity
+	@EnableConfigurationProperties(SecurityProperties.class)
+	static class TestRSocketSecurityConfiguration {
 
 	}
 
@@ -180,11 +201,11 @@ class ReactiveUserDetailsServiceAutoConfigurationTests {
 	}
 
 	@Configuration(proxyBeanMethods = false)
-	static class ReactiveOAuth2TokenIntrospectionClientConfiguration {
+	static class ReactiveOpaqueTokenIntrospectorConfiguration {
 
 		@Bean
-		ReactiveOAuth2TokenIntrospectionClient introspectionClient() {
-			return mock(ReactiveOAuth2TokenIntrospectionClient.class);
+		ReactiveOpaqueTokenIntrospector introspectionClient() {
+			return mock(ReactiveOpaqueTokenIntrospector.class);
 		}
 
 	}
