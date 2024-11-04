@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,10 @@
  */
 
 package org.springframework.boot.origin;
+
+import java.io.IOException;
+import java.net.URI;
+import java.net.URISyntaxException;
 
 import org.junit.jupiter.api.Test;
 
@@ -75,7 +79,7 @@ class TextResourceOriginTests {
 	@Test
 	void getLocationLineReturnsLine() {
 		Location location = new Location(1, 2);
-		assertThat(location.getLine()).isEqualTo(1);
+		assertThat(location.getLine()).isOne();
 	}
 
 	@Test
@@ -87,7 +91,7 @@ class TextResourceOriginTests {
 	@Test
 	void locationToStringReturnsNiceString() {
 		Location location = new Location(1, 2);
-		assertThat(location.toString()).isEqualTo("2:3");
+		assertThat(location).hasToString("2:3");
 	}
 
 	@Test
@@ -95,21 +99,42 @@ class TextResourceOriginTests {
 		ClassPathResource resource = new ClassPathResource("foo.txt");
 		Location location = new Location(1, 2);
 		TextResourceOrigin origin = new TextResourceOrigin(resource, location);
-		assertThat(origin.toString()).isEqualTo("class path resource [foo.txt]:2:3");
+		assertThat(origin).hasToString("class path resource [foo.txt] - 2:3");
 	}
 
 	@Test
 	void toStringWhenResourceIsNullReturnsNiceString() {
 		Location location = new Location(1, 2);
 		TextResourceOrigin origin = new TextResourceOrigin(null, location);
-		assertThat(origin.toString()).isEqualTo("unknown resource [?]:2:3");
+		assertThat(origin).hasToString("unknown resource [?] - 2:3");
 	}
 
 	@Test
 	void toStringWhenLocationIsNullReturnsNiceString() {
 		ClassPathResource resource = new ClassPathResource("foo.txt");
 		TextResourceOrigin origin = new TextResourceOrigin(resource, null);
-		assertThat(origin.toString()).isEqualTo("class path resource [foo.txt]");
+		assertThat(origin).hasToString("class path resource [foo.txt]");
+	}
+
+	@Test
+	void toStringWhenResourceIsClasspathResourceReturnsToStringWithJar() {
+		ClassPathResource resource = new ClassPathResource("foo.txt") {
+
+			@Override
+			public URI getURI() throws IOException {
+				try {
+					return new URI("jar:file:/home/user/project/target/project-0.0.1-SNAPSHOT.jar"
+							+ "!/BOOT-INF/classes!/foo.txt");
+				}
+				catch (URISyntaxException ex) {
+					throw new IllegalStateException(ex);
+				}
+			}
+
+		};
+		Location location = new Location(1, 2);
+		TextResourceOrigin origin = new TextResourceOrigin(resource, location);
+		assertThat(origin).hasToString("class path resource [foo.txt] from project-0.0.1-SNAPSHOT.jar - 2:3");
 	}
 
 	@Test
@@ -117,8 +142,8 @@ class TextResourceOriginTests {
 		Location location1 = new Location(1, 2);
 		Location location2 = new Location(1, 2);
 		Location location3 = new Location(2, 2);
-		assertThat(location1.hashCode()).isEqualTo(location1.hashCode());
-		assertThat(location1.hashCode()).isEqualTo(location2.hashCode());
+		assertThat(location1).hasSameHashCodeAs(location1);
+		assertThat(location1).hasSameHashCodeAs(location2);
 		assertThat(location1.hashCode()).isNotEqualTo(location3.hashCode());
 		assertThat(location1).isEqualTo(location1);
 		assertThat(location1).isEqualTo(location2);
@@ -131,8 +156,8 @@ class TextResourceOriginTests {
 		TextResourceOrigin origin2 = new TextResourceOrigin(new ClassPathResource("foo.txt"), new Location(1, 2));
 		TextResourceOrigin origin3 = new TextResourceOrigin(new ClassPathResource("foo.txt"), new Location(2, 2));
 		TextResourceOrigin origin4 = new TextResourceOrigin(new ClassPathResource("foo2.txt"), new Location(1, 2));
-		assertThat(origin1.hashCode()).isEqualTo(origin1.hashCode());
-		assertThat(origin1.hashCode()).isEqualTo(origin2.hashCode());
+		assertThat(origin1).hasSameHashCodeAs(origin1);
+		assertThat(origin1).hasSameHashCodeAs(origin2);
 		assertThat(origin1.hashCode()).isNotEqualTo(origin3.hashCode());
 		assertThat(origin1.hashCode()).isNotEqualTo(origin4.hashCode());
 		assertThat(origin1).isEqualTo(origin1);

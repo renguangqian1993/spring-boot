@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,14 @@
 
 package org.springframework.boot.actuate.autoconfigure.metrics;
 
+import java.time.Duration;
+
 import io.micrometer.core.instrument.Meter.Type;
 import org.junit.jupiter.api.Test;
+
+import org.springframework.aot.hint.RuntimeHints;
+import org.springframework.aot.hint.predicate.RuntimeHintsPredicates;
+import org.springframework.util.ReflectionUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -42,9 +48,15 @@ class ServiceLevelObjectiveBoundaryTests {
 	}
 
 	@Test
-	void getValueForTimerWhenFromDurationStringShouldReturnDurationNanos() {
+	void getValueForTimerWhenFromMillisecondDurationStringShouldReturnDurationNanos() {
 		ServiceLevelObjectiveBoundary slo = ServiceLevelObjectiveBoundary.valueOf("123ms");
 		assertThat(slo.getValue(Type.TIMER)).isEqualTo(123000000);
+	}
+
+	@Test
+	void getValueForTimerWhenFromDaysDurationStringShouldReturnDurationNanos() {
+		ServiceLevelObjectiveBoundary slo = ServiceLevelObjectiveBoundary.valueOf("1d");
+		assertThat(slo.getValue(Type.TIMER)).isEqualTo(Duration.ofDays(1).toNanos());
 	}
 
 	@Test
@@ -63,6 +75,18 @@ class ServiceLevelObjectiveBoundaryTests {
 	void getValueForDistributionSummaryWhenFromDurationShouldReturnNull() {
 		ServiceLevelObjectiveBoundary slo = ServiceLevelObjectiveBoundary.valueOf("123ms");
 		assertThat(slo.getValue(Type.DISTRIBUTION_SUMMARY)).isNull();
+	}
+
+	@Test
+	void shouldRegisterRuntimeHints() {
+		RuntimeHints runtimeHints = new RuntimeHints();
+		new ServiceLevelObjectiveBoundary.ServiceLevelObjectiveBoundaryHints().registerHints(runtimeHints,
+				getClass().getClassLoader());
+		ReflectionUtils.doWithLocalMethods(ServiceLevelObjectiveBoundary.class, (method) -> {
+			if ("valueOf".equals(method.getName())) {
+				assertThat(RuntimeHintsPredicates.reflection().onMethod(method)).accepts(runtimeHints);
+			}
+		});
 	}
 
 }

@@ -1,22 +1,22 @@
 plugins {
+	id "base"
 	id "org.jetbrains.kotlin.jvm" apply false // https://youtrack.jetbrains.com/issue/KT-30276
-	id "io.spring.nohttp" version "0.0.3.RELEASE"
 }
 
 description = "Spring Boot Build"
 
 defaultTasks 'build'
 
-nohttp {
-	whitelistFile = project.file("src/nohttp/whitelist.lines")
-	source.exclude "buildSrc/build/**"
-}
-
 allprojects {
 	group "org.springframework.boot"
+}
+
+subprojects {
+	apply plugin: "org.springframework.boot.conventions"
 
 	repositories {
 		mavenCentral()
+		spring.mavenRepositories()
 		if (version.contains('-')) {
 			maven { url "https://repo.spring.io/milestone" }
 		}
@@ -29,3 +29,4 @@ allprojects {
 		resolutionStrategy.cacheChangingModulesFor 0, "minutes"
 	}
 }
+

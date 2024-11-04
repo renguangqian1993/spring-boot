@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,13 +28,14 @@ public class Layers {
 
 	private boolean enabled = true;
 
+	@Deprecated(since = "3.3.0", forRemoval = true)
 	private boolean includeLayerTools = true;
 
 	private File configuration;
 
 	/**
-	 * Whether a layers.idx file should be added to the jar.
-	 * @return true if a layers.idx file should be added.
+	 * Whether a {@code layers.idx} file should be added to the jar.
+	 * @return true if a {@code layers.idx} file should be added.
 	 */
 	public boolean isEnabled() {
 		return this.enabled;
@@ -43,7 +44,9 @@ public class Layers {
 	/**
 	 * Whether to include the layer tools jar.
 	 * @return true if layer tools should be included
+	 * @deprecated since 3.3.0 for removal in 3.5.0 in favor of {@code includeTools}.
 	 */
+	@Deprecated(since = "3.3.0", forRemoval = true)
 	public boolean isIncludeLayerTools() {
 		return this.includeLayerTools;
 	}

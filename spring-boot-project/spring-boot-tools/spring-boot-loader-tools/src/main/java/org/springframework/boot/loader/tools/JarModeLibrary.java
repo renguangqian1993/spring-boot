@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,14 +35,14 @@ public class JarModeLibrary extends Library {
 	/**
 	 * {@link JarModeLibrary} for layer tools.
 	 */
-	public static final JarModeLibrary LAYER_TOOLS = new JarModeLibrary("spring-boot-jarmode-layertools");
+	public static final JarModeLibrary TOOLS = new JarModeLibrary("spring-boot-jarmode-tools");
 
 	JarModeLibrary(String artifactId) {
 		this(createCoordinates(artifactId));
 	}
 
 	public JarModeLibrary(LibraryCoordinates coordinates) {
-		super(getJarName(coordinates), null, LibraryScope.RUNTIME, coordinates, false);
+		super(getJarName(coordinates), null, LibraryScope.RUNTIME, coordinates, false, false, true);
 	}
 
 	private static LibraryCoordinates createCoordinates(String artifactId) {

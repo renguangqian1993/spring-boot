@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,9 +21,11 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.BeanFactoryUtils;
@@ -31,8 +33,13 @@ import org.springframework.beans.factory.ListableBeanFactory;
 import org.springframework.beans.factory.NoSuchBeanDefinitionException;
 import org.springframework.beans.factory.annotation.BeanFactoryAnnotationUtils;
 import org.springframework.boot.actuate.autoconfigure.health.HealthEndpointProperties.Group;
-import org.springframework.boot.actuate.autoconfigure.health.HealthProperties.Show;
 import org.springframework.boot.actuate.autoconfigure.health.HealthProperties.Status;
+import org.springframework.boot.actuate.endpoint.EndpointId;
+import org.springframework.boot.actuate.endpoint.Show;
+import org.springframework.boot.actuate.endpoint.web.AdditionalPathsMapper;
+import org.springframework.boot.actuate.endpoint.web.WebServerNamespace;
+import org.springframework.boot.actuate.health.AdditionalHealthEndpointPath;
+import org.springframework.boot.actuate.health.HealthEndpoint;
 import org.springframework.boot.actuate.health.HealthEndpointGroup;
 import org.springframework.boot.actuate.health.HealthEndpointGroups;
 import org.springframework.boot.actuate.health.HttpCodeStatusMapper;
@@ -48,8 +55,9 @@ import org.springframework.util.ObjectUtils;
  * Auto-configured {@link HealthEndpointGroups}.
  *
  * @author Phillip Webb
+ * @author Madhura Bhave
  */
-class AutoConfiguredHealthEndpointGroups implements HealthEndpointGroups {
+class AutoConfiguredHealthEndpointGroups implements HealthEndpointGroups, AdditionalPathsMapper {
 
 	private static final Predicate<String> ALL = (name) -> true;
 
@@ -63,8 +71,8 @@ class AutoConfiguredHealthEndpointGroups implements HealthEndpointGroups {
 	 * @param properties the health endpoint properties
 	 */
 	AutoConfiguredHealthEndpointGroups(ApplicationContext applicationContext, HealthEndpointProperties properties) {
-		ListableBeanFactory beanFactory = (applicationContext instanceof ConfigurableApplicationContext)
-				? ((ConfigurableApplicationContext) applicationContext).getBeanFactory() : applicationContext;
+		ListableBeanFactory beanFactory = (applicationContext instanceof ConfigurableApplicationContext configurableContext)
+				? configurableContext.getBeanFactory() : applicationContext;
 		Show showComponents = properties.getShowComponents();
 		Show showDetails = properties.getShowDetails();
 		Set<String> roles = properties.getRoles();
@@ -77,7 +85,7 @@ class AutoConfiguredHealthEndpointGroups implements HealthEndpointGroups {
 			httpCodeStatusMapper = new SimpleHttpCodeStatusMapper(properties.getStatus().getHttpMapping());
 		}
 		this.primaryGroup = new AutoConfiguredHealthEndpointGroup(ALL, statusAggregator, httpCodeStatusMapper,
-				showComponents, showDetails, roles);
+				showComponents, showDetails, roles, null);
 		this.groups = createGroups(properties.getGroup(), beanFactory, statusAggregator, httpCodeStatusMapper,
 				showComponents, showDetails, roles);
 	}
@@ -106,8 +114,10 @@ class AutoConfiguredHealthEndpointGroups implements HealthEndpointGroups {
 						return defaultHttpCodeStatusMapper;
 					});
 			Predicate<String> members = new IncludeExcludeGroupMemberPredicate(group.getInclude(), group.getExclude());
+			AdditionalHealthEndpointPath additionalPath = (group.getAdditionalPath() != null)
+					? AdditionalHealthEndpointPath.from(group.getAdditionalPath()) : null;
 			groups.put(groupName, new AutoConfiguredHealthEndpointGroup(members, statusAggregator, httpCodeStatusMapper,
-					showComponents, showDetails, roles));
+					showComponents, showDetails, roles, additionalPath));
 		});
 		return Collections.unmodifiableMap(groups);
 	}
@@ -153,6 +163,22 @@ class AutoConfiguredHealthEndpointGroups implements HealthEndpointGroups {
 	@Override
 	public HealthEndpointGroup get(String name) {
 		return this.groups.get(name);
+	}
+
+	@Override
+	public List<String> getAdditionalPaths(EndpointId endpointId, WebServerNamespace webServerNamespace) {
+		if (!HealthEndpoint.ID.equals(endpointId)) {
+			return null;
+		}
+		return streamAllGroups().map(HealthEndpointGroup::getAdditionalPath)
+			.filter(Objects::nonNull)
+			.filter((additionalPath) -> additionalPath.hasNamespace(webServerNamespace))
+			.map(AdditionalHealthEndpointPath::getValue)
+			.toList();
+	}
+
+	private Stream<HealthEndpointGroup> streamAllGroups() {
+		return Stream.concat(Stream.of(this.primaryGroup), this.groups.values().stream());
 	}
 
 }

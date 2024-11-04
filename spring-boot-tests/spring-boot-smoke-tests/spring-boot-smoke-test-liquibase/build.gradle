@@ -1,6 +1,5 @@
 plugins {
 	id "java"
-	id "org.springframework.boot.conventions"
 }
 
 description = "Spring Boot Liquibase smoke test"
@@ -9,7 +8,10 @@ dependencies {
 	implementation(project(":spring-boot-project:spring-boot-starters:spring-boot-starter-actuator"))
 	implementation(project(":spring-boot-project:spring-boot-starters:spring-boot-starter-jdbc"))
 	implementation(project(":spring-boot-project:spring-boot-starters:spring-boot-starter-web"))
-	implementation("org.liquibase:liquibase-core")
+	implementation("jakarta.xml.bind:jakarta.xml.bind-api")
+	implementation("org.liquibase:liquibase-core") {
+		exclude group: "javax.xml.bind", module: "jaxb-api"
+	}
 
 	runtimeOnly("com.h2database:h2")
 

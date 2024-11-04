@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,9 +30,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @author Marco Aust
  * @author Mark Paluch
  * @author Stephane Nicoll
+ * @author Scott Frederick
  * @since 1.0.0
  */
-@ConfigurationProperties(prefix = "spring.redis")
+@ConfigurationProperties(prefix = "spring.data.redis")
 public class RedisProperties {
 
 	/**
@@ -41,7 +42,7 @@ public class RedisProperties {
 	private int database = 0;
 
 	/**
-	 * Connection URL. Overrides host, port, and password. User is ignored. Example:
+	 * Connection URL. Overrides host, port, username, and password. Example:
 	 * redis://user:password@example.com:6379
 	 */
 	private String url;
@@ -52,6 +53,11 @@ public class RedisProperties {
 	private String host = "localhost";
 
 	/**
+	 * Login username of the redis server.
+	 */
+	private String username;
+
+	/**
 	 * Login password of the redis server.
 	 */
 	private String password;
@@ -60,11 +66,6 @@ public class RedisProperties {
 	 * Redis server port.
 	 */
 	private int port = 6379;
-
-	/**
-	 * Whether to enable SSL support.
-	 */
-	private boolean ssl;
 
 	/**
 	 * Read timeout.
@@ -89,6 +90,8 @@ public class RedisProperties {
 	private Sentinel sentinel;
 
 	private Cluster cluster;
+
+	private final Ssl ssl = new Ssl();
 
 	private final Jedis jedis = new Jedis();
 
@@ -118,6 +121,14 @@ public class RedisProperties {
 		this.host = host;
 	}
 
+	public String getUsername() {
+		return this.username;
+	}
+
+	public void setUsername(String username) {
+		this.username = username;
+	}
+
 	public String getPassword() {
 		return this.password;
 	}
@@ -134,12 +145,8 @@ public class RedisProperties {
 		this.port = port;
 	}
 
-	public boolean isSsl() {
+	public Ssl getSsl() {
 		return this.ssl;
-	}
-
-	public void setSsl(boolean ssl) {
-		this.ssl = ssl;
 	}
 
 	public void setTimeout(Duration timeout) {
@@ -221,6 +228,13 @@ public class RedisProperties {
 	public static class Pool {
 
 		/**
+		 * Whether to enable the pool. Enabled automatically if "commons-pool2" is
+		 * available. With Jedis, pooling is implicitly enabled in sentinel mode and this
+		 * setting only applies to single node setup.
+		 */
+		private Boolean enabled;
+
+		/**
 		 * Maximum number of "idle" connections in the pool. Use a negative value to
 		 * indicate an unlimited number of idle connections.
 		 */
@@ -251,6 +265,14 @@ public class RedisProperties {
 		 * object evictor thread starts, otherwise no idle object eviction is performed.
 		 */
 		private Duration timeBetweenEvictionRuns;
+
+		public Boolean getEnabled() {
+			return this.enabled;
+		}
+
+		public void setEnabled(Boolean enabled) {
+			this.enabled = enabled;
+		}
 
 		public int getMaxIdle() {
 			return this.maxIdle;
@@ -300,8 +322,8 @@ public class RedisProperties {
 	public static class Cluster {
 
 		/**
-		 * Comma-separated list of "host:port" pairs to bootstrap from. This represents an
-		 * "initial" list of cluster nodes and is required to have at least one entry.
+		 * List of "host:port" pairs to bootstrap from. This represents an "initial" list
+		 * of cluster nodes and is required to have at least one entry.
 		 */
 		private List<String> nodes;
 
@@ -340,9 +362,14 @@ public class RedisProperties {
 		private String master;
 
 		/**
-		 * Comma-separated list of "host:port" pairs.
+		 * List of "host:port" pairs.
 		 */
 		private List<String> nodes;
+
+		/**
+		 * Login username for authenticating with sentinel(s).
+		 */
+		private String username;
 
 		/**
 		 * Password for authenticating with sentinel(s).
@@ -365,12 +392,51 @@ public class RedisProperties {
 			this.nodes = nodes;
 		}
 
+		public String getUsername() {
+			return this.username;
+		}
+
+		public void setUsername(String username) {
+			this.username = username;
+		}
+
 		public String getPassword() {
 			return this.password;
 		}
 
 		public void setPassword(String password) {
 			this.password = password;
+		}
+
+	}
+
+	public static class Ssl {
+
+		/**
+		 * Whether to enable SSL support. Enabled automatically if "bundle" is provided
+		 * unless specified otherwise.
+		 */
+		private Boolean enabled;
+
+		/**
+		 * SSL bundle name.
+		 */
+		private String bundle;
+
+		public boolean isEnabled() {
+			return (this.enabled != null) ? this.enabled : this.bundle != null;
+		}
+
+		public void setEnabled(boolean enabled) {
+			this.enabled = enabled;
+		}
+
+		public String getBundle() {
+			return this.bundle;
+		}
+
+		public void setBundle(String bundle) {
+			this.bundle = bundle;
 		}
 
 	}
@@ -383,14 +449,10 @@ public class RedisProperties {
 		/**
 		 * Jedis pool configuration.
 		 */
-		private Pool pool;
+		private final Pool pool = new Pool();
 
 		public Pool getPool() {
 			return this.pool;
-		}
-
-		public void setPool(Pool pool) {
-			this.pool = pool;
 		}
 
 	}
@@ -408,7 +470,7 @@ public class RedisProperties {
 		/**
 		 * Lettuce pool configuration.
 		 */
-		private Pool pool;
+		private final Pool pool = new Pool();
 
 		private final Cluster cluster = new Cluster();
 
@@ -422,10 +484,6 @@ public class RedisProperties {
 
 		public Pool getPool() {
 			return this.pool;
-		}
-
-		public void setPool(Pool pool) {
-			this.pool = pool;
 		}
 
 		public Cluster getCluster() {

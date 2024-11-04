@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,10 @@ import java.io.File;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import org.springframework.core.io.DefaultResourceLoader;
+import org.springframework.util.FileCopyUtils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -32,28 +36,48 @@ import static org.mockito.Mockito.mock;
  */
 class ConfigTreeConfigDataLocationResolverTests {
 
-	private ConfigTreeConfigDataLocationResolver resolver = new ConfigTreeConfigDataLocationResolver();
+	private final ConfigTreeConfigDataLocationResolver resolver = new ConfigTreeConfigDataLocationResolver(
+			new DefaultResourceLoader());
 
-	private ConfigDataLocationResolverContext context = mock(ConfigDataLocationResolverContext.class);
+	private final ConfigDataLocationResolverContext context = mock(ConfigDataLocationResolverContext.class);
+
+	@TempDir
+	File temp;
 
 	@Test
 	void isResolvableWhenPrefixMatchesReturnsTrue() {
-		assertThat(this.resolver.isResolvable(this.context, "configtree:/etc/config")).isTrue();
+		assertThat(this.resolver.isResolvable(this.context, ConfigDataLocation.of("configtree:/etc/config"))).isTrue();
 	}
 
 	@Test
 	void isResolvableWhenPrefixDoesNotMatchReturnsFalse() {
-		assertThat(this.resolver.isResolvable(this.context, "http://etc/config")).isFalse();
-		assertThat(this.resolver.isResolvable(this.context, "/etc/config")).isFalse();
+		assertThat(this.resolver.isResolvable(this.context, ConfigDataLocation.of("http://etc/config"))).isFalse();
+		assertThat(this.resolver.isResolvable(this.context, ConfigDataLocation.of("/etc/config"))).isFalse();
 	}
 
 	@Test
 	void resolveReturnsConfigVolumeMountLocation() {
-		List<ConfigTreeConfigDataLocation> locations = this.resolver.resolve(this.context, "configtree:/etc/config",
-				false);
-		assertThat(locations.size()).isEqualTo(1);
+		List<ConfigTreeConfigDataResource> locations = this.resolver.resolve(this.context,
+				ConfigDataLocation.of("configtree:/etc/config/"));
+		assertThat(locations).hasSize(1);
 		assertThat(locations).extracting(Object::toString)
-				.containsExactly("config tree [" + new File("/etc/config").getAbsolutePath() + "]");
+			.containsExactly("config tree [" + new File("/etc/config").getAbsolutePath() + "]");
+	}
+
+	@Test
+	void resolveWildcardPattern() throws Exception {
+		File directoryA = new File(this.temp, "a");
+		File directoryB = new File(this.temp, "b");
+		directoryA.mkdirs();
+		directoryB.mkdirs();
+		FileCopyUtils.copy("test".getBytes(), new File(directoryA, "spring"));
+		FileCopyUtils.copy("test".getBytes(), new File(directoryB, "boot"));
+		List<ConfigTreeConfigDataResource> locations = this.resolver.resolve(this.context,
+				ConfigDataLocation.of("configtree:" + this.temp.getAbsolutePath() + "/*/"));
+		assertThat(locations).hasSize(2);
+		assertThat(locations).extracting(Object::toString)
+			.containsExactly("config tree [" + directoryA.getAbsolutePath() + "]",
+					"config tree [" + directoryB.getAbsolutePath() + "]");
 	}
 
 }

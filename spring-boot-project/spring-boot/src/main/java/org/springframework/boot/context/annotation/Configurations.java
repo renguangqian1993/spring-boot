@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -33,6 +34,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.ImportSelector;
 import org.springframework.core.OrderComparator;
 import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.test.context.junit4.SpringRunner;
 import org.springframework.util.Assert;
 import org.springframework.util.ClassUtils;
@@ -47,8 +49,8 @@ import org.springframework.util.ClassUtils;
  * This class is primarily intended for use with tests that need to specify configuration
  * classes but can't use {@link SpringRunner}.
  * <p>
- * Implementations of this class should be annotated with {@code @Order} or implement
- * {@link Ordered}.
+ * Implementations of this class should be annotated with {@link Order @Order} or
+ * implement {@link Ordered}.
  *
  * @author Phillip Webb
  * @since 2.0.0
@@ -57,13 +59,34 @@ import org.springframework.util.ClassUtils;
 public abstract class Configurations {
 
 	private static final Comparator<Object> COMPARATOR = OrderComparator.INSTANCE
-			.thenComparing((other) -> other.getClass().getName());
+		.thenComparing((other) -> other.getClass().getName());
+
+	private final UnaryOperator<Collection<Class<?>>> sorter;
 
 	private final Set<Class<?>> classes;
 
+	/**
+	 * Create a new {@link Configurations} instance.
+	 * @param classes the configuration classes
+	 */
 	protected Configurations(Collection<Class<?>> classes) {
 		Assert.notNull(classes, "Classes must not be null");
 		Collection<Class<?>> sorted = sort(classes);
+		this.sorter = null;
+		this.classes = Collections.unmodifiableSet(new LinkedHashSet<>(sorted));
+	}
+
+	/**
+	 * Create a new {@link Configurations} instance.
+	 * @param sorter a {@link UnaryOperator} used to sort the configurations
+	 * @param classes the configuration classes
+	 * @since 3.4.0
+	 */
+	protected Configurations(UnaryOperator<Collection<Class<?>>> sorter, Collection<Class<?>> classes) {
+		Assert.notNull(sorter, "Sorter must not be null");
+		Assert.notNull(classes, "Classes must not be null");
+		Collection<Class<?>> sorted = sorter.apply(classes);
+		this.sorter = sorter;
 		this.classes = Collections.unmodifiableSet(new LinkedHashSet<>(sorted));
 	}
 
@@ -71,7 +94,10 @@ public abstract class Configurations {
 	 * Sort configuration classes into the order that they should be applied.
 	 * @param classes the classes to sort
 	 * @return a sorted set of classes
+	 * @deprecated since 3.4.0 for removal in 3.6.0 in favor of
+	 * {@link #Configurations(UnaryOperator, Collection)}
 	 */
+	@Deprecated(since = "3.4.0", forRemoval = true)
 	protected Collection<Class<?>> sort(Collection<Class<?>> classes) {
 		return classes;
 	}
@@ -89,6 +115,9 @@ public abstract class Configurations {
 	protected Configurations merge(Configurations other) {
 		Set<Class<?>> mergedClasses = new LinkedHashSet<>(getClasses());
 		mergedClasses.addAll(other.getClasses());
+		if (this.sorter != null) {
+			mergedClasses = new LinkedHashSet<>(this.sorter.apply(mergedClasses));
+		}
 		return merge(mergedClasses);
 	}
 
@@ -119,8 +148,9 @@ public abstract class Configurations {
 		List<Configurations> ordered = new ArrayList<>(configurations);
 		ordered.sort(COMPARATOR);
 		List<Configurations> collated = collate(ordered);
-		LinkedHashSet<Class<?>> classes = collated.stream().flatMap(Configurations::streamClasses)
-				.collect(Collectors.toCollection(LinkedHashSet::new));
+		LinkedHashSet<Class<?>> classes = collated.stream()
+			.flatMap(Configurations::streamClasses)
+			.collect(Collectors.toCollection(LinkedHashSet::new));
 		return ClassUtils.toClassArray(classes);
 	}
 

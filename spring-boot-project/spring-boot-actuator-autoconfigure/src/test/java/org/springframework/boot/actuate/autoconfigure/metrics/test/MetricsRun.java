@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.function.Function;
 
-import org.springframework.boot.actuate.autoconfigure.metrics.MeterRegistryAutoConfiguration;
+import org.springframework.boot.actuate.autoconfigure.metrics.CompositeMeterRegistryAutoConfiguration;
 import org.springframework.boot.actuate.autoconfigure.metrics.MetricsAutoConfiguration;
 import org.springframework.boot.actuate.autoconfigure.metrics.export.atlas.AtlasMetricsExportAutoConfiguration;
 import org.springframework.boot.actuate.autoconfigure.metrics.export.datadog.DatadogMetricsExportAutoConfiguration;
@@ -30,6 +30,7 @@ import org.springframework.boot.actuate.autoconfigure.metrics.export.graphite.Gr
 import org.springframework.boot.actuate.autoconfigure.metrics.export.influx.InfluxMetricsExportAutoConfiguration;
 import org.springframework.boot.actuate.autoconfigure.metrics.export.jmx.JmxMetricsExportAutoConfiguration;
 import org.springframework.boot.actuate.autoconfigure.metrics.export.newrelic.NewRelicMetricsExportAutoConfiguration;
+import org.springframework.boot.actuate.autoconfigure.metrics.export.otlp.OtlpMetricsExportAutoConfiguration;
 import org.springframework.boot.actuate.autoconfigure.metrics.export.prometheus.PrometheusMetricsExportAutoConfiguration;
 import org.springframework.boot.actuate.autoconfigure.metrics.export.signalfx.SignalFxMetricsExportAutoConfiguration;
 import org.springframework.boot.actuate.autoconfigure.metrics.export.simple.SimpleMetricsExportAutoConfiguration;
@@ -59,6 +60,7 @@ public final class MetricsRun {
 		implementations.add(InfluxMetricsExportAutoConfiguration.class);
 		implementations.add(JmxMetricsExportAutoConfiguration.class);
 		implementations.add(NewRelicMetricsExportAutoConfiguration.class);
+		implementations.add(OtlpMetricsExportAutoConfiguration.class);
 		implementations.add(PrometheusMetricsExportAutoConfiguration.class);
 		implementations.add(SimpleMetricsExportAutoConfiguration.class);
 		implementations.add(SignalFxMetricsExportAutoConfiguration.class);
@@ -67,7 +69,7 @@ public final class MetricsRun {
 	}
 
 	private static final AutoConfigurations AUTO_CONFIGURATIONS = AutoConfigurations.of(MetricsAutoConfiguration.class,
-			MeterRegistryAutoConfiguration.class);
+			CompositeMeterRegistryAutoConfiguration.class);
 
 	private MetricsRun() {
 	}
@@ -100,8 +102,8 @@ public final class MetricsRun {
 					() -> "Unknown export auto-configuration " + configuration.getName());
 		}
 		return (T) contextRunner.withPropertyValues("management.metrics.use-global-registry=false")
-				.withConfiguration(AUTO_CONFIGURATIONS)
-				.withConfiguration(AutoConfigurations.of(exportAutoConfigurations));
+			.withConfiguration(AUTO_CONFIGURATIONS)
+			.withConfiguration(AutoConfigurations.of(exportAutoConfigurations));
 	}
 
 }

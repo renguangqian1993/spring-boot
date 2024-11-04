@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2022 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,25 +31,25 @@ import static org.mockito.Mockito.mock;
  */
 class ConfigDataLoaderTests {
 
-	private TestConfigDataLoader loader = new TestConfigDataLoader();
+	private final TestConfigDataLoader loader = new TestConfigDataLoader();
 
-	private ConfigDataLoaderContext context = mock(ConfigDataLoaderContext.class);
+	private final ConfigDataLoaderContext context = mock(ConfigDataLoaderContext.class);
 
 	@Test
 	void isLoadableAlwaysReturnsTrue() {
-		assertThat(this.loader.isLoadable(this.context, new TestConfigDataLocation())).isTrue();
+		assertThat(this.loader.isLoadable(this.context, new TestConfigDataResource())).isTrue();
 	}
 
-	static class TestConfigDataLoader implements ConfigDataLoader<TestConfigDataLocation> {
+	static class TestConfigDataLoader implements ConfigDataLoader<TestConfigDataResource> {
 
 		@Override
-		public ConfigData load(ConfigDataLoaderContext context, TestConfigDataLocation location) throws IOException {
+		public ConfigData load(ConfigDataLoaderContext context, TestConfigDataResource resource) throws IOException {
 			return null;
 		}
 
 	}
 
-	static class TestConfigDataLocation extends ConfigDataLocation {
+	static class TestConfigDataResource extends ConfigDataResource {
 
 	}
 

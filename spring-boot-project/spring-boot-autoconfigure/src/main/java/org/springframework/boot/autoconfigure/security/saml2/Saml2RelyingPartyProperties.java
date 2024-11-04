@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.boot.context.properties.DeprecatedConfigurationProperty;
 import org.springframework.core.io.Resource;
 import org.springframework.security.saml2.provider.service.registration.Saml2MessageBinding;
 
@@ -31,6 +30,8 @@ import org.springframework.security.saml2.provider.service.registration.Saml2Mes
  *
  * @author Madhura Bhave
  * @author Phillip Webb
+ * @author Moritz Halbritter
+ * @author Lasse Wulff
  * @since 2.2.0
  */
 @ConfigurationProperties("spring.security.saml2.relyingparty")
@@ -51,40 +52,104 @@ public class Saml2RelyingPartyProperties {
 	public static class Registration {
 
 		/**
-		 * Relying party's entity ID template. Can generate its entity ID based on
-		 * possible variables of "baseUrl", "registrationId", "baseScheme", "baseHost",
-		 * and "basePort".
+		 * Relying party's entity ID. The value may contain a number of placeholders. They
+		 * are "baseUrl", "registrationId", "baseScheme", "baseHost", and "basePort".
 		 */
-		private String relyingPartyEntityId = "{baseUrl}/saml2/service-provider-metadata/{registrationId}";
+		private String entityId = "{baseUrl}/saml2/service-provider-metadata/{registrationId}";
+
+		/**
+		 * Assertion Consumer Service.
+		 */
+		private final Acs acs = new Acs();
 
 		private final Signing signing = new Signing();
+
+		private final Decryption decryption = new Decryption();
+
+		private final Singlelogout singlelogout = new Singlelogout();
 
 		/**
 		 * Remote SAML Identity Provider.
 		 */
-		private final Identityprovider identityprovider = new Identityprovider();
+		private final AssertingParty assertingparty = new AssertingParty();
 
-		public String getRelyingPartyEntityId() {
-			return this.relyingPartyEntityId;
+		/**
+		 * Name ID format for a relying party registration.
+		 */
+		private String nameIdFormat;
+
+		public String getEntityId() {
+			return this.entityId;
 		}
 
-		public void setRelyingPartyEntityId(String entityId) {
-			this.relyingPartyEntityId = entityId;
+		public void setEntityId(String entityId) {
+			this.entityId = entityId;
+		}
+
+		public Acs getAcs() {
+			return this.acs;
 		}
 
 		public Signing getSigning() {
 			return this.signing;
 		}
 
-		public Identityprovider getIdentityprovider() {
-			return this.identityprovider;
+		public Decryption getDecryption() {
+			return this.decryption;
+		}
+
+		public Singlelogout getSinglelogout() {
+			return this.singlelogout;
+		}
+
+		public AssertingParty getAssertingparty() {
+			return this.assertingparty;
+		}
+
+		public String getNameIdFormat() {
+			return this.nameIdFormat;
+		}
+
+		public void setNameIdFormat(String nameIdFormat) {
+			this.nameIdFormat = nameIdFormat;
+		}
+
+		public static class Acs {
+
+			/**
+			 * Assertion Consumer Service location template. Can generate its location
+			 * based on possible variables of "baseUrl", "registrationId", "baseScheme",
+			 * "baseHost", and "basePort".
+			 */
+			private String location = "{baseUrl}/login/saml2/sso/{registrationId}";
+
+			/**
+			 * Assertion Consumer Service binding.
+			 */
+			private Saml2MessageBinding binding = Saml2MessageBinding.POST;
+
+			public String getLocation() {
+				return this.location;
+			}
+
+			public void setLocation(String location) {
+				this.location = location;
+			}
+
+			public Saml2MessageBinding getBinding() {
+				return this.binding;
+			}
+
+			public void setBinding(Saml2MessageBinding binding) {
+				this.binding = binding;
+			}
+
 		}
 
 		public static class Signing {
 
 			/**
-			 * Credentials used for signing and decrypting the SAML authentication
-			 * request.
+			 * Credentials used for signing the SAML authentication request.
 			 */
 			private List<Credential> credentials = new ArrayList<>();
 
@@ -99,7 +164,7 @@ public class Saml2RelyingPartyProperties {
 			public static class Credential {
 
 				/**
-				 * Private key used for signing or decrypting.
+				 * Private key used for signing.
 				 */
 				private Resource privateKeyLocation;
 
@@ -130,10 +195,57 @@ public class Saml2RelyingPartyProperties {
 
 	}
 
+	public static class Decryption {
+
+		/**
+		 * Credentials used for decrypting the SAML authentication request.
+		 */
+		private List<Credential> credentials = new ArrayList<>();
+
+		public List<Credential> getCredentials() {
+			return this.credentials;
+		}
+
+		public void setCredentials(List<Credential> credentials) {
+			this.credentials = credentials;
+		}
+
+		public static class Credential {
+
+			/**
+			 * Private key used for decrypting.
+			 */
+			private Resource privateKeyLocation;
+
+			/**
+			 * Relying Party X509Certificate shared with the identity provider.
+			 */
+			private Resource certificateLocation;
+
+			public Resource getPrivateKeyLocation() {
+				return this.privateKeyLocation;
+			}
+
+			public void setPrivateKeyLocation(Resource privateKey) {
+				this.privateKeyLocation = privateKey;
+			}
+
+			public Resource getCertificateLocation() {
+				return this.certificateLocation;
+			}
+
+			public void setCertificateLocation(Resource certificate) {
+				this.certificateLocation = certificate;
+			}
+
+		}
+
+	}
+
 	/**
 	 * Represents a remote Identity Provider.
 	 */
-	public static class Identityprovider {
+	public static class AssertingParty {
 
 		/**
 		 * Unique identifier for the identity provider.
@@ -148,6 +260,8 @@ public class Saml2RelyingPartyProperties {
 		private final Singlesignon singlesignon = new Singlesignon();
 
 		private final Verification verification = new Verification();
+
+		private final Singlelogout singlelogout = new Singlelogout();
 
 		public String getEntityId() {
 			return this.entityId;
@@ -165,23 +279,16 @@ public class Saml2RelyingPartyProperties {
 			this.metadataUri = metadataUri;
 		}
 
-		@Deprecated
-		@DeprecatedConfigurationProperty(reason = "moved to 'singlesignon.url'")
-		public String getSsoUrl() {
-			return this.singlesignon.getUrl();
-		}
-
-		@Deprecated
-		public void setSsoUrl(String ssoUrl) {
-			this.singlesignon.setUrl(ssoUrl);
-		}
-
 		public Singlesignon getSinglesignon() {
 			return this.singlesignon;
 		}
 
 		public Verification getVerification() {
 			return this.verification;
+		}
+
+		public Singlelogout getSinglelogout() {
+			return this.singlelogout;
 		}
 
 		/**
@@ -197,12 +304,12 @@ public class Saml2RelyingPartyProperties {
 			/**
 			 * Whether to redirect or post authentication requests.
 			 */
-			private Saml2MessageBinding binding = Saml2MessageBinding.REDIRECT;
+			private Saml2MessageBinding binding;
 
 			/**
 			 * Whether to sign authentication requests.
 			 */
-			private boolean signRequest = true;
+			private Boolean signRequest;
 
 			public String getUrl() {
 				return this.url;
@@ -224,7 +331,11 @@ public class Saml2RelyingPartyProperties {
 				return this.signRequest;
 			}
 
-			public void setSignRequest(boolean signRequest) {
+			public Boolean getSignRequest() {
+				return this.signRequest;
+			}
+
+			public void setSignRequest(Boolean signRequest) {
 				this.signRequest = signRequest;
 			}
 
@@ -266,6 +377,52 @@ public class Saml2RelyingPartyProperties {
 
 			}
 
+		}
+
+	}
+
+	/**
+	 * Single logout details.
+	 */
+	public static class Singlelogout {
+
+		/**
+		 * Location where SAML2 LogoutRequest gets sent to.
+		 */
+		private String url;
+
+		/**
+		 * Location where SAML2 LogoutResponse gets sent to.
+		 */
+		private String responseUrl;
+
+		/**
+		 * Whether to redirect or post logout requests.
+		 */
+		private Saml2MessageBinding binding;
+
+		public String getUrl() {
+			return this.url;
+		}
+
+		public void setUrl(String url) {
+			this.url = url;
+		}
+
+		public String getResponseUrl() {
+			return this.responseUrl;
+		}
+
+		public void setResponseUrl(String responseUrl) {
+			this.responseUrl = responseUrl;
+		}
+
+		public Saml2MessageBinding getBinding() {
+			return this.binding;
+		}
+
+		public void setBinding(Saml2MessageBinding binding) {
+			this.binding = binding;
 		}
 
 	}

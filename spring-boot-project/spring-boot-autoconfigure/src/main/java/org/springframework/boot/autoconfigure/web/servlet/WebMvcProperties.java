@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,44 +18,31 @@ package org.springframework.boot.autoconfigure.web.servlet;
 
 import java.time.Duration;
 import java.util.LinkedHashMap;
-import java.util.Locale;
 import java.util.Map;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.boot.context.properties.DeprecatedConfigurationProperty;
-import org.springframework.boot.context.properties.IncompatibleConfigurationException;
 import org.springframework.http.MediaType;
 import org.springframework.util.Assert;
 import org.springframework.validation.DefaultMessageCodesResolver;
 
 /**
- * {@link ConfigurationProperties properties} for Spring MVC.
+ * {@link ConfigurationProperties Properties} for Spring MVC.
  *
  * @author Phillip Webb
  * @author Sébastien Deleuze
  * @author Stephane Nicoll
  * @author Eddú Meléndez
  * @author Brian Clozel
+ * @author Vedran Pavic
  * @since 2.0.0
  */
 @ConfigurationProperties(prefix = "spring.mvc")
 public class WebMvcProperties {
 
 	/**
-	 * Formatting strategy for message codes. For instance, `PREFIX_ERROR_CODE`.
+	 * Formatting strategy for message codes. For instance, 'PREFIX_ERROR_CODE'.
 	 */
 	private DefaultMessageCodesResolver.Format messageCodesResolverFormat;
-
-	/**
-	 * Locale to use. By default, this locale is overridden by the "Accept-Language"
-	 * header.
-	 */
-	private Locale locale;
-
-	/**
-	 * Define how the locale should be resolved.
-	 */
-	private LocaleResolver localeResolver = LocaleResolver.ACCEPT_HEADER;
 
 	private final Format format = new Format();
 
@@ -70,21 +57,9 @@ public class WebMvcProperties {
 	private boolean dispatchOptionsRequest = true;
 
 	/**
-	 * Whether the content of the "default" model should be ignored during redirect
-	 * scenarios.
-	 */
-	private boolean ignoreDefaultModelOnRedirect = true;
-
-	/**
 	 * Whether to publish a ServletRequestHandledEvent at the end of each request.
 	 */
 	private boolean publishRequestHandledEvents = true;
-
-	/**
-	 * Whether a "NoHandlerFoundException" should be thrown if no Handler was found to
-	 * process a request.
-	 */
-	private boolean throwExceptionIfNoHandlerFound = false;
 
 	/**
 	 * Whether logging of (potentially sensitive) request details at DEBUG and TRACE level
@@ -103,6 +78,11 @@ public class WebMvcProperties {
 	 */
 	private String staticPathPattern = "/**";
 
+	/**
+	 * Path pattern used for WebJar assets.
+	 */
+	private String webjarsPathPattern = "/webjars/**";
+
 	private final Async async = new Async();
 
 	private final Servlet servlet = new Servlet();
@@ -113,6 +93,8 @@ public class WebMvcProperties {
 
 	private final Pathmatch pathmatch = new Pathmatch();
 
+	private final Problemdetails problemdetails = new Problemdetails();
+
 	public DefaultMessageCodesResolver.Format getMessageCodesResolverFormat() {
 		return this.messageCodesResolverFormat;
 	}
@@ -121,43 +103,8 @@ public class WebMvcProperties {
 		this.messageCodesResolverFormat = messageCodesResolverFormat;
 	}
 
-	public Locale getLocale() {
-		return this.locale;
-	}
-
-	public void setLocale(Locale locale) {
-		this.locale = locale;
-	}
-
-	public LocaleResolver getLocaleResolver() {
-		return this.localeResolver;
-	}
-
-	public void setLocaleResolver(LocaleResolver localeResolver) {
-		this.localeResolver = localeResolver;
-	}
-
-	@Deprecated
-	@DeprecatedConfigurationProperty(replacement = "spring.mvc.format.date")
-	public String getDateFormat() {
-		return this.format.getDate();
-	}
-
-	@Deprecated
-	public void setDateFormat(String dateFormat) {
-		this.format.setDate(dateFormat);
-	}
-
 	public Format getFormat() {
 		return this.format;
-	}
-
-	public boolean isIgnoreDefaultModelOnRedirect() {
-		return this.ignoreDefaultModelOnRedirect;
-	}
-
-	public void setIgnoreDefaultModelOnRedirect(boolean ignoreDefaultModelOnRedirect) {
-		this.ignoreDefaultModelOnRedirect = ignoreDefaultModelOnRedirect;
 	}
 
 	public boolean isPublishRequestHandledEvents() {
@@ -166,14 +113,6 @@ public class WebMvcProperties {
 
 	public void setPublishRequestHandledEvents(boolean publishRequestHandledEvents) {
 		this.publishRequestHandledEvents = publishRequestHandledEvents;
-	}
-
-	public boolean isThrowExceptionIfNoHandlerFound() {
-		return this.throwExceptionIfNoHandlerFound;
-	}
-
-	public void setThrowExceptionIfNoHandlerFound(boolean throwExceptionIfNoHandlerFound) {
-		this.throwExceptionIfNoHandlerFound = throwExceptionIfNoHandlerFound;
 	}
 
 	public boolean isLogRequestDetails() {
@@ -216,6 +155,14 @@ public class WebMvcProperties {
 		this.staticPathPattern = staticPathPattern;
 	}
 
+	public String getWebjarsPathPattern() {
+		return this.webjarsPathPattern;
+	}
+
+	public void setWebjarsPathPattern(String webjarsPathPattern) {
+		this.webjarsPathPattern = webjarsPathPattern;
+	}
+
 	public Async getAsync() {
 		return this.async;
 	}
@@ -236,22 +183,8 @@ public class WebMvcProperties {
 		return this.pathmatch;
 	}
 
-	@SuppressWarnings("deprecation")
-	public void checkConfiguration() {
-		if (this.getPathmatch().getMatchingStrategy() == MatchingStrategy.PATH_PATTERN_PARSER) {
-			if (this.getPathmatch().isUseSuffixPattern()) {
-				throw new IncompatibleConfigurationException("spring.mvc.pathmatch.matching-strategy",
-						"spring.mvc.pathmatch.use-suffix-pattern");
-			}
-			if (this.getPathmatch().isUseRegisteredSuffixPattern()) {
-				throw new IncompatibleConfigurationException("spring.mvc.pathmatch.matching-strategy",
-						"spring.mvc.pathmatch.use-registered-suffix-pattern");
-			}
-			if (!this.getServlet().getServletMapping().equals("/")) {
-				throw new IncompatibleConfigurationException("spring.mvc.pathmatch.matching-strategy",
-						"spring.mvc.servlet.path");
-			}
-		}
+	public Problemdetails getProblemdetails() {
+		return this.problemdetails;
 	}
 
 	public static class Async {
@@ -304,7 +237,7 @@ public class WebMvcProperties {
 		}
 
 		public String getServletMapping() {
-			if (this.path.equals("") || this.path.equals("/")) {
+			if (this.path.isEmpty() || this.path.equals("/")) {
 				return "/";
 			}
 			if (this.path.endsWith("/")) {
@@ -368,13 +301,6 @@ public class WebMvcProperties {
 	public static class Contentnegotiation {
 
 		/**
-		 * Whether the path extension in the URL path should be used to determine the
-		 * requested media type. If enabled a request "/users.pdf" will be interpreted as
-		 * a request for "application/pdf" regardless of the 'Accept' header.
-		 */
-		private boolean favorPathExtension = false;
-
-		/**
 		 * Whether a request parameter ("format" by default) should be used to determine
 		 * the requested media type.
 		 */
@@ -390,18 +316,6 @@ public class WebMvcProperties {
 		 * Query parameter name to use when "favor-parameter" is enabled.
 		 */
 		private String parameterName;
-
-		@DeprecatedConfigurationProperty(
-				reason = "Use of path extensions for request mapping and for content negotiation is discouraged.")
-		@Deprecated
-		public boolean isFavorPathExtension() {
-			return this.favorPathExtension;
-		}
-
-		@Deprecated
-		public void setFavorPathExtension(boolean favorPathExtension) {
-			this.favorPathExtension = favorPathExtension;
-		}
 
 		public boolean isFavorParameter() {
 			return this.favorParameter;
@@ -434,23 +348,7 @@ public class WebMvcProperties {
 		/**
 		 * Choice of strategy for matching request paths against registered mappings.
 		 */
-		private MatchingStrategy matchingStrategy = MatchingStrategy.ANT_PATH_MATCHER;
-
-		/**
-		 * Whether to use suffix pattern match (".*") when matching patterns to requests.
-		 * If enabled a method mapped to "/users" also matches to "/users.*". Enabling
-		 * this option is not compatible with the PathPatternParser matching strategy.
-		 */
-		private boolean useSuffixPattern = false;
-
-		/**
-		 * Whether suffix pattern matching should work only against extensions registered
-		 * with "spring.mvc.contentnegotiation.media-types.*". This is generally
-		 * recommended to reduce ambiguity and to avoid issues such as when a "." appears
-		 * in the path for other reasons. Enabling this option is not compatible with the
-		 * PathPatternParser matching strategy.
-		 */
-		private boolean useRegisteredSuffixPattern = false;
+		private MatchingStrategy matchingStrategy = MatchingStrategy.PATH_PATTERN_PARSER;
 
 		public MatchingStrategy getMatchingStrategy() {
 			return this.matchingStrategy;
@@ -460,46 +358,25 @@ public class WebMvcProperties {
 			this.matchingStrategy = matchingStrategy;
 		}
 
-		@DeprecatedConfigurationProperty(
-				reason = "Use of path extensions for request mapping and for content negotiation is discouraged.")
-		@Deprecated
-		public boolean isUseSuffixPattern() {
-			return this.useSuffixPattern;
-		}
-
-		@Deprecated
-		public void setUseSuffixPattern(boolean useSuffixPattern) {
-			this.useSuffixPattern = useSuffixPattern;
-		}
-
-		@DeprecatedConfigurationProperty(
-				reason = "Use of path extensions for request mapping and for content negotiation is discouraged.")
-		@Deprecated
-		public boolean isUseRegisteredSuffixPattern() {
-			return this.useRegisteredSuffixPattern;
-		}
-
-		@Deprecated
-		public void setUseRegisteredSuffixPattern(boolean useRegisteredSuffixPattern) {
-			this.useRegisteredSuffixPattern = useRegisteredSuffixPattern;
-		}
-
 	}
 
 	public static class Format {
 
 		/**
-		 * Date format to use, for example `dd/MM/yyyy`.
+		 * Date format to use, for example 'dd/MM/yyyy'. Used for formatting of
+		 * java.util.Date and java.time.LocalDate.
 		 */
 		private String date;
 
 		/**
-		 * Time format to use, for example `HH:mm:ss`.
+		 * Time format to use, for example 'HH:mm:ss'. Used for formatting of java.time's
+		 * LocalTime and OffsetTime.
 		 */
 		private String time;
 
 		/**
-		 * Date-time format to use, for example `yyyy-MM-dd HH:mm:ss`.
+		 * Date-time format to use, for example 'yyyy-MM-dd HH:mm:ss'. Used for formatting
+		 * of java.time's LocalDateTime, OffsetDateTime, and ZonedDateTime.
 		 */
 		private String dateTime;
 
@@ -529,6 +406,11 @@ public class WebMvcProperties {
 
 	}
 
+	/**
+	 * Matching strategy options.
+	 *
+	 * @since 2.4.0
+	 */
 	public enum MatchingStrategy {
 
 		/**
@@ -543,18 +425,20 @@ public class WebMvcProperties {
 
 	}
 
-	public enum LocaleResolver {
+	public static class Problemdetails {
 
 		/**
-		 * Always use the configured locale.
+		 * Whether RFC 9457 Problem Details support should be enabled.
 		 */
-		FIXED,
+		private boolean enabled = false;
 
-		/**
-		 * Use the "Accept-Language" header or the configured locale if the header is not
-		 * set.
-		 */
-		ACCEPT_HEADER
+		public boolean isEnabled() {
+			return this.enabled;
+		}
+
+		public void setEnabled(boolean enabled) {
+			this.enabled = enabled;
+		}
 
 	}
 

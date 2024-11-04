@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,11 @@ import java.util.stream.Stream;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 
+import org.springframework.boot.actuate.endpoint.OperationResponseBody;
+import org.springframework.boot.actuate.endpoint.SanitizableData;
 import org.springframework.boot.actuate.endpoint.Sanitizer;
+import org.springframework.boot.actuate.endpoint.SanitizingFunction;
+import org.springframework.boot.actuate.endpoint.Show;
 import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
 import org.springframework.boot.actuate.endpoint.annotation.ReadOperation;
 import org.springframework.boot.actuate.endpoint.annotation.Selector;
@@ -44,9 +48,8 @@ import org.springframework.core.env.MutablePropertySources;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.env.StandardEnvironment;
 import org.springframework.lang.Nullable;
-import org.springframework.util.PropertyPlaceholderHelper;
+import org.springframework.util.ClassUtils;
 import org.springframework.util.StringUtils;
-import org.springframework.util.SystemPropertyUtils;
 
 /**
  * {@link Endpoint @Endpoint} to expose {@link ConfigurableEnvironment environment}
@@ -57,53 +60,62 @@ import org.springframework.util.SystemPropertyUtils;
  * @author Christian Dupuis
  * @author Madhura Bhave
  * @author Stephane Nicoll
+ * @author Scott Frederick
  * @since 2.0.0
  */
 @Endpoint(id = "env")
 public class EnvironmentEndpoint {
 
-	private final Sanitizer sanitizer = new Sanitizer();
+	private final Sanitizer sanitizer;
 
 	private final Environment environment;
 
-	public EnvironmentEndpoint(Environment environment) {
-		this.environment = environment;
-	}
+	private final Show showValues;
 
-	public void setKeysToSanitize(String... keysToSanitize) {
-		this.sanitizer.setKeysToSanitize(keysToSanitize);
+	public EnvironmentEndpoint(Environment environment, Iterable<SanitizingFunction> sanitizingFunctions,
+			Show showValues) {
+		this.environment = environment;
+		this.sanitizer = new Sanitizer(sanitizingFunctions);
+		this.showValues = showValues;
 	}
 
 	@ReadOperation
 	public EnvironmentDescriptor environment(@Nullable String pattern) {
+		boolean showUnsanitized = this.showValues.isShown(true);
+		return getEnvironmentDescriptor(pattern, showUnsanitized);
+	}
+
+	EnvironmentDescriptor getEnvironmentDescriptor(String pattern, boolean showUnsanitized) {
 		if (StringUtils.hasText(pattern)) {
-			return getEnvironmentDescriptor(Pattern.compile(pattern).asPredicate());
+			return getEnvironmentDescriptor(Pattern.compile(pattern).asPredicate(), showUnsanitized);
 		}
-		return getEnvironmentDescriptor((name) -> true);
+		return getEnvironmentDescriptor((name) -> true, showUnsanitized);
+	}
+
+	private EnvironmentDescriptor getEnvironmentDescriptor(Predicate<String> propertyNamePredicate,
+			boolean showUnsanitized) {
+		List<PropertySourceDescriptor> propertySources = new ArrayList<>();
+		getPropertySourcesAsMap().forEach((sourceName, source) -> {
+			if (source instanceof EnumerablePropertySource) {
+				propertySources.add(describeSource(sourceName, (EnumerablePropertySource<?>) source,
+						propertyNamePredicate, showUnsanitized));
+			}
+		});
+		return new EnvironmentDescriptor(Arrays.asList(this.environment.getActiveProfiles()),
+				Arrays.asList(this.environment.getDefaultProfiles()), propertySources);
 	}
 
 	@ReadOperation
 	public EnvironmentEntryDescriptor environmentEntry(@Selector String toMatch) {
-		return getEnvironmentEntryDescriptor(toMatch);
+		boolean showUnsanitized = this.showValues.isShown(true);
+		return getEnvironmentEntryDescriptor(toMatch, showUnsanitized);
 	}
 
-	private EnvironmentDescriptor getEnvironmentDescriptor(Predicate<String> propertyNamePredicate) {
-		PlaceholdersResolver resolver = getResolver();
-		List<PropertySourceDescriptor> propertySources = new ArrayList<>();
-		getPropertySourcesAsMap().forEach((sourceName, source) -> {
-			if (source instanceof EnumerablePropertySource) {
-				propertySources.add(describeSource(sourceName, (EnumerablePropertySource<?>) source, resolver,
-						propertyNamePredicate));
-			}
-		});
-		return new EnvironmentDescriptor(Arrays.asList(this.environment.getActiveProfiles()), propertySources);
-	}
-
-	private EnvironmentEntryDescriptor getEnvironmentEntryDescriptor(String propertyName) {
-		Map<String, PropertyValueDescriptor> descriptors = getPropertySourceDescriptors(propertyName);
+	EnvironmentEntryDescriptor getEnvironmentEntryDescriptor(String propertyName, boolean showUnsanitized) {
+		Map<String, PropertyValueDescriptor> descriptors = getPropertySourceDescriptors(propertyName, showUnsanitized);
 		PropertySummaryDescriptor summary = getPropertySummaryDescriptor(descriptors);
 		return new EnvironmentEntryDescriptor(summary, Arrays.asList(this.environment.getActiveProfiles()),
-				toPropertySourceDescriptors(descriptors));
+				Arrays.asList(this.environment.getDefaultProfiles()), toPropertySourceDescriptors(descriptors));
 	}
 
 	private List<PropertySourceEntryDescriptor> toPropertySourceDescriptors(
@@ -122,32 +134,30 @@ public class EnvironmentEndpoint {
 		return null;
 	}
 
-	private Map<String, PropertyValueDescriptor> getPropertySourceDescriptors(String propertyName) {
+	private Map<String, PropertyValueDescriptor> getPropertySourceDescriptors(String propertyName,
+			boolean showUnsanitized) {
 		Map<String, PropertyValueDescriptor> propertySources = new LinkedHashMap<>();
-		PlaceholdersResolver resolver = getResolver();
 		getPropertySourcesAsMap().forEach((sourceName, source) -> propertySources.put(sourceName,
-				source.containsProperty(propertyName) ? describeValueOf(propertyName, source, resolver) : null));
+				source.containsProperty(propertyName) ? describeValueOf(propertyName, source, showUnsanitized) : null));
 		return propertySources;
 	}
 
 	private PropertySourceDescriptor describeSource(String sourceName, EnumerablePropertySource<?> source,
-			PlaceholdersResolver resolver, Predicate<String> namePredicate) {
+			Predicate<String> namePredicate, boolean showUnsanitized) {
 		Map<String, PropertyValueDescriptor> properties = new LinkedHashMap<>();
-		Stream.of(source.getPropertyNames()).filter(namePredicate)
-				.forEach((name) -> properties.put(name, describeValueOf(name, source, resolver)));
+		Stream.of(source.getPropertyNames())
+			.filter(namePredicate)
+			.forEach((name) -> properties.put(name, describeValueOf(name, source, showUnsanitized)));
 		return new PropertySourceDescriptor(sourceName, properties);
 	}
 
 	@SuppressWarnings("unchecked")
-	private PropertyValueDescriptor describeValueOf(String name, PropertySource<?> source,
-			PlaceholdersResolver resolver) {
+	private PropertyValueDescriptor describeValueOf(String name, PropertySource<?> source, boolean showUnsanitized) {
+		PlaceholdersResolver resolver = new PropertySourcesPlaceholdersResolver(getPropertySources());
 		Object resolved = resolver.resolvePlaceholders(source.getProperty(name));
 		Origin origin = ((source instanceof OriginLookup) ? ((OriginLookup<Object>) source).getOrigin(name) : null);
-		return new PropertyValueDescriptor(sanitize(name, resolved), origin);
-	}
-
-	private PlaceholdersResolver getResolver() {
-		return new PropertySourcesPlaceholdersSanitizingResolver(getPropertySources(), this.sanitizer);
+		Object sanitizedValue = sanitize(source, name, resolved, showUnsanitized);
+		return new PropertyValueDescriptor(stringifyIfNecessary(sanitizedValue), origin);
 	}
 
 	private Map<String, PropertySource<?>> getPropertySourcesAsMap() {
@@ -161,15 +171,15 @@ public class EnvironmentEndpoint {
 	}
 
 	private MutablePropertySources getPropertySources() {
-		if (this.environment instanceof ConfigurableEnvironment) {
-			return ((ConfigurableEnvironment) this.environment).getPropertySources();
+		if (this.environment instanceof ConfigurableEnvironment configurableEnvironment) {
+			return configurableEnvironment.getPropertySources();
 		}
 		return new StandardEnvironment().getPropertySources();
 	}
 
 	private void extract(String root, Map<String, PropertySource<?>> map, PropertySource<?> source) {
-		if (source instanceof CompositePropertySource) {
-			for (PropertySource<?> nest : ((CompositePropertySource) source).getPropertySources()) {
+		if (source instanceof CompositePropertySource compositePropertySource) {
+			for (PropertySource<?> nest : compositePropertySource.getPropertySources()) {
 				extract(source.getName() + ":", map, nest);
 			}
 		}
@@ -178,51 +188,45 @@ public class EnvironmentEndpoint {
 		}
 	}
 
-	public Object sanitize(String name, Object object) {
-		return this.sanitizer.sanitize(name, object);
+	private Object sanitize(PropertySource<?> source, String name, Object value, boolean showUnsanitized) {
+		return this.sanitizer.sanitize(new SanitizableData(source, name, value), showUnsanitized);
+	}
+
+	protected Object stringifyIfNecessary(Object value) {
+		if (value == null || ClassUtils.isPrimitiveOrWrapper(value.getClass())
+				|| Number.class.isAssignableFrom(value.getClass())) {
+			return value;
+		}
+		if (CharSequence.class.isAssignableFrom(value.getClass())) {
+			return value.toString();
+		}
+		return "Complex property type " + value.getClass().getName();
 	}
 
 	/**
-	 * {@link PropertySourcesPlaceholdersResolver} that sanitizes sensitive placeholders
-	 * if present.
+	 * Description of an {@link Environment}.
 	 */
-	private static class PropertySourcesPlaceholdersSanitizingResolver extends PropertySourcesPlaceholdersResolver {
-
-		private final Sanitizer sanitizer;
-
-		PropertySourcesPlaceholdersSanitizingResolver(Iterable<PropertySource<?>> sources, Sanitizer sanitizer) {
-			super(sources, new PropertyPlaceholderHelper(SystemPropertyUtils.PLACEHOLDER_PREFIX,
-					SystemPropertyUtils.PLACEHOLDER_SUFFIX, SystemPropertyUtils.VALUE_SEPARATOR, true));
-			this.sanitizer = sanitizer;
-		}
-
-		@Override
-		protected String resolvePlaceholder(String placeholder) {
-			String value = super.resolvePlaceholder(placeholder);
-			if (value == null) {
-				return null;
-			}
-			return (String) this.sanitizer.sanitize(placeholder, value);
-		}
-
-	}
-
-	/**
-	 * A description of an {@link Environment}.
-	 */
-	public static final class EnvironmentDescriptor {
+	public static final class EnvironmentDescriptor implements OperationResponseBody {
 
 		private final List<String> activeProfiles;
 
+		private final List<String> defaultProfiles;
+
 		private final List<PropertySourceDescriptor> propertySources;
 
-		private EnvironmentDescriptor(List<String> activeProfiles, List<PropertySourceDescriptor> propertySources) {
+		private EnvironmentDescriptor(List<String> activeProfiles, List<String> defaultProfiles,
+				List<PropertySourceDescriptor> propertySources) {
 			this.activeProfiles = activeProfiles;
+			this.defaultProfiles = defaultProfiles;
 			this.propertySources = propertySources;
 		}
 
 		public List<String> getActiveProfiles() {
 			return this.activeProfiles;
+		}
+
+		public List<String> getDefaultProfiles() {
+			return this.defaultProfiles;
 		}
 
 		public List<PropertySourceDescriptor> getPropertySources() {
@@ -232,7 +236,7 @@ public class EnvironmentEndpoint {
 	}
 
 	/**
-	 * A description of an entry of the {@link Environment}.
+	 * Description of an entry of the {@link Environment}.
 	 */
 	@JsonInclude(JsonInclude.Include.NON_NULL)
 	public static final class EnvironmentEntryDescriptor {
@@ -241,12 +245,15 @@ public class EnvironmentEndpoint {
 
 		private final List<String> activeProfiles;
 
+		private final List<String> defaultProfiles;
+
 		private final List<PropertySourceEntryDescriptor> propertySources;
 
-		private EnvironmentEntryDescriptor(PropertySummaryDescriptor property, List<String> activeProfiles,
-				List<PropertySourceEntryDescriptor> propertySources) {
+		EnvironmentEntryDescriptor(PropertySummaryDescriptor property, List<String> activeProfiles,
+				List<String> defaultProfiles, List<PropertySourceEntryDescriptor> propertySources) {
 			this.property = property;
 			this.activeProfiles = activeProfiles;
+			this.defaultProfiles = defaultProfiles;
 			this.propertySources = propertySources;
 		}
 
@@ -258,6 +265,10 @@ public class EnvironmentEndpoint {
 			return this.activeProfiles;
 		}
 
+		public List<String> getDefaultProfiles() {
+			return this.defaultProfiles;
+		}
+
 		public List<PropertySourceEntryDescriptor> getPropertySources() {
 			return this.propertySources;
 		}
@@ -265,7 +276,7 @@ public class EnvironmentEndpoint {
 	}
 
 	/**
-	 * A summary of a particular entry of the {@link Environment}.
+	 * Description of a particular entry of the {@link Environment}.
 	 */
 	@JsonInclude(JsonInclude.Include.NON_NULL)
 	public static final class PropertySummaryDescriptor {
@@ -290,7 +301,7 @@ public class EnvironmentEndpoint {
 	}
 
 	/**
-	 * A description of a {@link PropertySource}.
+	 * Description of a {@link PropertySource}.
 	 */
 	public static final class PropertySourceDescriptor {
 
@@ -314,7 +325,7 @@ public class EnvironmentEndpoint {
 	}
 
 	/**
-	 * A description of a particular entry of {@link PropertySource}.
+	 * Description of a particular entry of {@link PropertySource}.
 	 */
 	@JsonInclude(JsonInclude.Include.NON_NULL)
 	public static final class PropertySourceEntryDescriptor {
@@ -339,7 +350,7 @@ public class EnvironmentEndpoint {
 	}
 
 	/**
-	 * A description of a property's value, including its origin if available.
+	 * Description of a property's value, including its origin if available.
 	 */
 	@JsonInclude(JsonInclude.Include.NON_NULL)
 	public static final class PropertyValueDescriptor {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,10 +56,12 @@ import org.springframework.util.Assert;
 public class ImageArchive implements TarArchive {
 
 	private static final Instant WINDOWS_EPOCH_PLUS_SECOND = OffsetDateTime.of(1980, 1, 1, 0, 0, 1, 0, ZoneOffset.UTC)
-			.toInstant();
+		.toInstant();
 
 	private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_ZONED_DATE_TIME
-			.withZone(ZoneOffset.UTC);
+		.withZone(ZoneOffset.UTC);
+
+	private static final String EMPTY_LAYER_NAME_PREFIX = "blank_";
 
 	private static final IOConsumer<Update> NO_UPDATES = (update) -> {
 	};
@@ -74,17 +76,23 @@ public class ImageArchive implements TarArchive {
 
 	private final String os;
 
+	private final String architecture;
+
+	private final String variant;
+
 	private final List<LayerId> existingLayers;
 
 	private final List<Layer> newLayers;
 
 	ImageArchive(ObjectMapper objectMapper, ImageConfig imageConfig, Instant createDate, ImageReference tag, String os,
-			List<LayerId> existingLayers, List<Layer> newLayers) {
+			String architecture, String variant, List<LayerId> existingLayers, List<Layer> newLayers) {
 		this.objectMapper = objectMapper;
 		this.imageConfig = imageConfig;
 		this.createDate = createDate;
 		this.tag = tag;
 		this.os = os;
+		this.architecture = architecture;
+		this.variant = variant;
 		this.existingLayers = existingLayers;
 		this.newLayers = newLayers;
 	}
@@ -98,7 +106,7 @@ public class ImageArchive implements TarArchive {
 	}
 
 	/**
-	 * Return the create data of the archive.
+	 * Return the create date of the archive.
 	 * @return the create date
 	 */
 	public Instant getCreateDate() {
@@ -125,6 +133,9 @@ public class ImageArchive implements TarArchive {
 	}
 
 	private List<LayerId> writeLayers(Layout writer) throws IOException {
+		for (int i = 0; i < this.existingLayers.size(); i++) {
+			writeEmptyLayer(writer, EMPTY_LAYER_NAME_PREFIX + i);
+		}
 		List<LayerId> writtenLayers = new ArrayList<>();
 		for (Layer layer : this.newLayers) {
 			writtenLayers.add(writeLayer(writer, layer));
@@ -132,9 +143,13 @@ public class ImageArchive implements TarArchive {
 		return Collections.unmodifiableList(writtenLayers);
 	}
 
+	private void writeEmptyLayer(Layout writer, String name) throws IOException {
+		writer.file(name, Owner.ROOT, Content.of(""));
+	}
+
 	private LayerId writeLayer(Layout writer, Layer layer) throws IOException {
 		LayerId id = layer.getId();
-		writer.file("/" + id.getHash() + ".tar", Owner.ROOT, layer);
+		writer.file(id.getHash() + ".tar", Owner.ROOT, layer);
 		return id;
 	}
 
@@ -144,7 +159,7 @@ public class ImageArchive implements TarArchive {
 			String json = this.objectMapper.writeValueAsString(config).replace("\r\n", "\n");
 			MessageDigest digest = MessageDigest.getInstance("SHA-256");
 			InspectedContent content = InspectedContent.of(Content.of(json), digest::update);
-			String name = "/" + LayerId.ofSha256Digest(digest.digest()).getHash() + ".json";
+			String name = LayerId.ofSha256Digest(digest.digest()).getHash() + ".json";
 			writer.file(name, Owner.ROOT, content);
 			return name;
 		}
@@ -155,11 +170,13 @@ public class ImageArchive implements TarArchive {
 
 	private ObjectNode createConfig(List<LayerId> writtenLayers) {
 		ObjectNode config = this.objectMapper.createObjectNode();
-		config.set("config", this.imageConfig.getNodeCopy());
-		config.set("created", config.textNode(getCreatedDate()));
-		config.set("history", createHistory(writtenLayers));
-		config.set("os", config.textNode(this.os));
-		config.set("rootfs", createRootFs(writtenLayers));
+		config.set("Config", this.imageConfig.getNodeCopy());
+		config.set("Created", config.textNode(getCreatedDate()));
+		config.set("History", createHistory(writtenLayers));
+		config.set("Os", config.textNode(this.os));
+		config.set("Architecture", config.textNode(this.architecture));
+		config.set("Variant", config.textNode(this.variant));
+		config.set("RootFS", createRootFs(writtenLayers));
 		return config;
 	}
 
@@ -187,7 +204,7 @@ public class ImageArchive implements TarArchive {
 	private void writeManifest(Layout writer, String config, List<LayerId> writtenLayers) throws IOException {
 		ArrayNode manifest = createManifest(config, writtenLayers);
 		String manifestJson = this.objectMapper.writeValueAsString(manifest);
-		writer.file("/manifest.json", Owner.ROOT, Content.of(manifestJson));
+		writer.file("manifest.json", Owner.ROOT, Content.of(manifestJson));
 	}
 
 	private ArrayNode createManifest(String config, List<LayerId> writtenLayers) {
@@ -204,7 +221,7 @@ public class ImageArchive implements TarArchive {
 	private ArrayNode getManifestLayers(List<LayerId> writtenLayers) {
 		ArrayNode layers = this.objectMapper.createArrayNode();
 		for (int i = 0; i < this.existingLayers.size(); i++) {
-			layers.add("");
+			layers.add(EMPTY_LAYER_NAME_PREFIX + i);
 		}
 		writtenLayers.stream().map((id) -> id.getHash() + ".tar").forEach(layers::add);
 		return layers;
@@ -255,7 +272,8 @@ public class ImageArchive implements TarArchive {
 			update.accept(this);
 			Instant createDate = (this.createDate != null) ? this.createDate : WINDOWS_EPOCH_PLUS_SECOND;
 			return new ImageArchive(SharedObjectMapper.get(), this.config, createDate, this.tag, this.image.getOs(),
-					this.image.getLayers(), Collections.unmodifiableList(this.newLayers));
+					this.image.getArchitecture(), this.image.getVariant(), this.image.getLayers(),
+					Collections.unmodifiableList(this.newLayers));
 		}
 
 		/**

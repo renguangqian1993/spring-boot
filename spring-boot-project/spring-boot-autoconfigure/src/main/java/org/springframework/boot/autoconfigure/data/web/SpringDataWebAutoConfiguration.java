@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2019 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 
 package org.springframework.boot.autoconfigure.data.web;
 
-import org.springframework.boot.autoconfigure.AutoConfigureAfter;
+import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -26,12 +26,12 @@ import org.springframework.boot.autoconfigure.data.rest.RepositoryRestMvcAutoCon
 import org.springframework.boot.autoconfigure.data.web.SpringDataWebProperties.Pageable;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.data.web.config.EnableSpringDataWebSupport;
 import org.springframework.data.web.config.PageableHandlerMethodArgumentResolverCustomizer;
 import org.springframework.data.web.config.SortHandlerMethodArgumentResolverCustomizer;
+import org.springframework.data.web.config.SpringDataWebSettings;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
@@ -43,15 +43,15 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  *
  * @author Andy Wilkinson
  * @author Vedran Pavic
+ * @author Yanming Zhou
  * @since 1.2.0
  */
-@Configuration(proxyBeanMethods = false)
+@AutoConfiguration(after = RepositoryRestMvcAutoConfiguration.class)
 @EnableSpringDataWebSupport
 @ConditionalOnWebApplication(type = Type.SERVLET)
 @ConditionalOnClass({ PageableHandlerMethodArgumentResolver.class, WebMvcConfigurer.class })
 @ConditionalOnMissingBean(PageableHandlerMethodArgumentResolver.class)
 @EnableConfigurationProperties(SpringDataWebProperties.class)
-@AutoConfigureAfter(RepositoryRestMvcAutoConfiguration.class)
 public class SpringDataWebAutoConfiguration {
 
 	private final SpringDataWebProperties properties;
@@ -79,6 +79,12 @@ public class SpringDataWebAutoConfiguration {
 	@ConditionalOnMissingBean
 	public SortHandlerMethodArgumentResolverCustomizer sortCustomizer() {
 		return (resolver) -> resolver.setSortParameter(this.properties.getSort().getSortParameter());
+	}
+
+	@Bean
+	@ConditionalOnMissingBean
+	public SpringDataWebSettings springDataWebSettings() {
+		return new SpringDataWebSettings(this.properties.getPageable().getSerializationMode());
 	}
 
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2021 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,11 +16,15 @@
 
 package org.springframework.boot.env;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 import org.apache.commons.logging.Log;
 
+import org.springframework.boot.BootstrapContext;
+import org.springframework.boot.BootstrapRegistry;
+import org.springframework.boot.ConfigurableBootstrapContext;
 import org.springframework.boot.logging.DeferredLogFactory;
 import org.springframework.boot.util.Instantiator;
 
@@ -32,30 +36,40 @@ import org.springframework.boot.util.Instantiator;
  */
 class ReflectionEnvironmentPostProcessorsFactory implements EnvironmentPostProcessorsFactory {
 
+	private final List<Class<?>> classes;
+
+	private ClassLoader classLoader;
+
 	private final List<String> classNames;
 
 	ReflectionEnvironmentPostProcessorsFactory(Class<?>... classes) {
-		this(Arrays.stream(classes).map(Class::getName).toArray(String[]::new));
+		this.classes = new ArrayList<>(Arrays.asList(classes));
+		this.classNames = null;
 	}
 
-	ReflectionEnvironmentPostProcessorsFactory(String... classNames) {
-		this(Arrays.asList(classNames));
+	ReflectionEnvironmentPostProcessorsFactory(ClassLoader classLoader, String... classNames) {
+		this(classLoader, Arrays.asList(classNames));
 	}
 
-	ReflectionEnvironmentPostProcessorsFactory(List<String> classNames) {
+	ReflectionEnvironmentPostProcessorsFactory(ClassLoader classLoader, List<String> classNames) {
+		this.classes = null;
+		this.classLoader = classLoader;
 		this.classNames = classNames;
 	}
 
 	@Override
 	public List<EnvironmentPostProcessor> getEnvironmentPostProcessors(DeferredLogFactory logFactory,
-			BootstrapRegistry bootstrapRegistry) {
+			ConfigurableBootstrapContext bootstrapContext) {
 		Instantiator<EnvironmentPostProcessor> instantiator = new Instantiator<>(EnvironmentPostProcessor.class,
 				(parameters) -> {
 					parameters.add(DeferredLogFactory.class, logFactory);
 					parameters.add(Log.class, logFactory::getLog);
-					parameters.add(BootstrapRegistry.class, bootstrapRegistry);
+					parameters.add(ConfigurableBootstrapContext.class, bootstrapContext);
+					parameters.add(BootstrapContext.class, bootstrapContext);
+					parameters.add(BootstrapRegistry.class, bootstrapContext);
 				});
-		return instantiator.instantiate(this.classNames);
+		return (this.classes != null) ? instantiator.instantiateTypes(this.classes)
+				: instantiator.instantiate(this.classLoader, this.classNames);
 	}
 
 }

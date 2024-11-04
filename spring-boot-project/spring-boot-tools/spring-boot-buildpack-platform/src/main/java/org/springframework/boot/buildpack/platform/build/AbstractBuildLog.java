@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,9 @@ import java.util.function.Consumer;
 
 import org.springframework.boot.buildpack.platform.docker.LogUpdateEvent;
 import org.springframework.boot.buildpack.platform.docker.TotalProgressEvent;
+import org.springframework.boot.buildpack.platform.docker.type.Binding;
 import org.springframework.boot.buildpack.platform.docker.type.Image;
+import org.springframework.boot.buildpack.platform.docker.type.ImagePlatform;
 import org.springframework.boot.buildpack.platform.docker.type.ImageReference;
 import org.springframework.boot.buildpack.platform.docker.type.VolumeName;
 
@@ -31,6 +33,7 @@ import org.springframework.boot.buildpack.platform.docker.type.VolumeName;
  * @author Phillip Webb
  * @author Scott Frederick
  * @author Andrey Shlykov
+ * @author Rafael Ceccone
  * @since 2.3.0
  */
 public abstract class AbstractBuildLog implements BuildLog {
@@ -42,32 +45,12 @@ public abstract class AbstractBuildLog implements BuildLog {
 	}
 
 	@Override
-	@Deprecated
-	public Consumer<TotalProgressEvent> pullingBuilder(BuildRequest request, ImageReference imageReference) {
-		return pullingImage(imageReference, ImageType.BUILDER);
-	}
-
-	@Override
-	@Deprecated
-	public void pulledBuilder(BuildRequest request, Image image) {
-		pulledImage(image, ImageType.BUILDER);
-	}
-
-	@Override
-	@Deprecated
-	public Consumer<TotalProgressEvent> pullingRunImage(BuildRequest request, ImageReference imageReference) {
-		return pullingImage(imageReference, ImageType.RUNNER);
-	}
-
-	@Override
-	@Deprecated
-	public void pulledRunImage(BuildRequest request, Image image) {
-		pulledImage(image, ImageType.RUNNER);
-	}
-
-	@Override
-	public Consumer<TotalProgressEvent> pullingImage(ImageReference imageReference, ImageType imageType) {
-		return getProgressConsumer(String.format(" > Pulling %s '%s'", imageType.getDescription(), imageReference));
+	public Consumer<TotalProgressEvent> pullingImage(ImageReference imageReference, ImagePlatform platform,
+			ImageType imageType) {
+		return (platform != null)
+				? getProgressConsumer(" > Pulling %s '%s' for platform '%s'".formatted(imageType.getDescription(),
+						imageReference, platform))
+				: getProgressConsumer(" > Pulling %s '%s'".formatted(imageType.getDescription(), imageReference));
 	}
 
 	@Override
@@ -76,9 +59,25 @@ public abstract class AbstractBuildLog implements BuildLog {
 	}
 
 	@Override
+	public Consumer<TotalProgressEvent> pushingImage(ImageReference imageReference) {
+		return getProgressConsumer(String.format(" > Pushing image '%s'", imageReference));
+	}
+
+	@Override
+	public void pushedImage(ImageReference imageReference) {
+		log(String.format(" > Pushed image '%s'", imageReference));
+	}
+
+	@Override
 	public void executingLifecycle(BuildRequest request, LifecycleVersion version, VolumeName buildCacheVolume) {
 		log(" > Executing lifecycle version " + version);
 		log(" > Using build cache volume '" + buildCacheVolume + "'");
+	}
+
+	@Override
+	public void executingLifecycle(BuildRequest request, LifecycleVersion version, Cache buildCache) {
+		log(" > Executing lifecycle version " + version);
+		log(" > Using build cache " + buildCache);
 	}
 
 	@Override
@@ -100,6 +99,30 @@ public abstract class AbstractBuildLog implements BuildLog {
 	public void executedLifecycle(BuildRequest request) {
 		log();
 		log("Successfully built image '" + request.getName() + "'");
+		log();
+	}
+
+	@Override
+	public void taggedImage(ImageReference tag) {
+		log("Successfully created image tag '" + tag + "'");
+		log();
+	}
+
+	@Override
+	public void failedCleaningWorkDir(Cache cache, Exception exception) {
+		StringBuilder message = new StringBuilder("Warning: Working location " + cache + " could not be cleaned");
+		if (exception != null) {
+			message.append(": ").append(exception.getMessage());
+		}
+		log();
+		log(message.toString());
+		log();
+	}
+
+	@Override
+	public void sensitiveTargetBindingDetected(Binding binding) {
+		log("Warning: Binding '%s' uses a container path which is used by buildpacks while building. Binding to it can cause problems!"
+			.formatted(binding));
 		log();
 	}
 

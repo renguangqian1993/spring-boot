@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,10 @@
 
 package org.springframework.boot.web.embedded.jetty;
 
+import java.lang.reflect.Method;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.function.Supplier;
 
 import org.apache.commons.logging.Log;
@@ -26,22 +29,23 @@ import org.eclipse.jetty.server.Server;
 
 import org.springframework.boot.web.server.GracefulShutdownCallback;
 import org.springframework.boot.web.server.GracefulShutdownResult;
-import org.springframework.core.log.LogMessage;
+import org.springframework.util.ReflectionUtils;
 
 /**
  * Handles Jetty graceful shutdown.
  *
  * @author Andy Wilkinson
+ * @author Onur Kagan Ozcan
  */
 final class GracefulShutdown {
 
-	private static final Log logger = LogFactory.getLog(JettyWebServer.class);
+	private static final Log logger = LogFactory.getLog(GracefulShutdown.class);
 
 	private final Server server;
 
 	private final Supplier<Integer> activeRequests;
 
-	private volatile boolean shuttingDown = false;
+	private volatile boolean aborted = false;
 
 	GracefulShutdown(Server server, Supplier<Integer> activeRequests) {
 		this.server = server;
@@ -50,39 +54,57 @@ final class GracefulShutdown {
 
 	void shutDownGracefully(GracefulShutdownCallback callback) {
 		logger.info("Commencing graceful shutdown. Waiting for active requests to complete");
-		for (Connector connector : this.server.getConnectors()) {
-			shutdown(connector);
-		}
-		this.shuttingDown = true;
 		new Thread(() -> awaitShutdown(callback), "jetty-shutdown").start();
+		boolean jetty10 = isJetty10();
+		for (Connector connector : this.server.getConnectors()) {
+			shutdown(connector, !jetty10);
+		}
 
 	}
 
-	private void shutdown(Connector connector) {
+	@SuppressWarnings("unchecked")
+	private void shutdown(Connector connector, boolean getResult) {
+		Future<Void> result;
 		try {
-			connector.shutdown().get();
+			result = connector.shutdown();
 		}
-		catch (InterruptedException ex) {
-			Thread.currentThread().interrupt();
+		catch (NoSuchMethodError ex) {
+			Method shutdown = ReflectionUtils.findMethod(connector.getClass(), "shutdown");
+			result = (Future<Void>) ReflectionUtils.invokeMethod(shutdown, connector);
 		}
-		catch (ExecutionException ex) {
-			// Continue
+		if (getResult) {
+			try {
+				result.get();
+			}
+			catch (InterruptedException ex) {
+				Thread.currentThread().interrupt();
+			}
+			catch (ExecutionException ex) {
+				// Continue
+			}
+		}
+	}
+
+	private boolean isJetty10() {
+		try {
+			return CompletableFuture.class.equals(Connector.class.getMethod("shutdown").getReturnType());
+		}
+		catch (Exception ex) {
+			return false;
 		}
 	}
 
 	private void awaitShutdown(GracefulShutdownCallback callback) {
-		while (this.shuttingDown && this.activeRequests.get() > 0) {
+		while (!this.aborted && this.activeRequests.get() > 0) {
 			sleep(100);
 		}
-		this.shuttingDown = false;
-		long activeRequests = this.activeRequests.get();
-		if (activeRequests == 0) {
-			logger.info("Graceful shutdown complete");
-			callback.shutdownComplete(GracefulShutdownResult.IDLE);
+		if (this.aborted) {
+			logger.info("Graceful shutdown aborted with one or more requests still active");
+			callback.shutdownComplete(GracefulShutdownResult.REQUESTS_ACTIVE);
 		}
 		else {
-			logger.info(LogMessage.format("Graceful shutdown aborted with %d request(s) still active", activeRequests));
-			callback.shutdownComplete(GracefulShutdownResult.REQUESTS_ACTIVE);
+			logger.info("Graceful shutdown complete");
+			callback.shutdownComplete(GracefulShutdownResult.IDLE);
 		}
 	}
 
@@ -96,7 +118,7 @@ final class GracefulShutdown {
 	}
 
 	void abort() {
-		this.shuttingDown = false;
+		this.aborted = true;
 	}
 
 }

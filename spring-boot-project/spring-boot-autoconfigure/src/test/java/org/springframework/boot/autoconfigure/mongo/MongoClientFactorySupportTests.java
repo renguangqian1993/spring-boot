@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,8 +30,8 @@ import org.springframework.context.annotation.Configuration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.then;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 
 /**
  * Tests for {@link MongoClientFactorySupport}.
@@ -43,6 +43,7 @@ import static org.mockito.Mockito.verify;
  * @author Mark Paluch
  * @author Artsiom Yudovin
  * @author Scott Frederick
+ * @author Moritz Halbritter
  */
 abstract class MongoClientFactorySupportTests<T> {
 
@@ -76,20 +77,20 @@ abstract class MongoClientFactorySupportTests<T> {
 		T client = createMongoClient(settings);
 		MongoClientSettings wrapped = getClientSettings(client);
 		assertThat(wrapped.getSocketSettings().getConnectTimeout(TimeUnit.MILLISECONDS))
-				.isEqualTo(settings.getSocketSettings().getConnectTimeout(TimeUnit.MILLISECONDS));
+			.isEqualTo(settings.getSocketSettings().getConnectTimeout(TimeUnit.MILLISECONDS));
 		assertThat(wrapped.getSocketSettings().getReadTimeout(TimeUnit.MILLISECONDS))
-				.isEqualTo(settings.getSocketSettings().getReadTimeout(TimeUnit.MILLISECONDS));
+			.isEqualTo(settings.getSocketSettings().getReadTimeout(TimeUnit.MILLISECONDS));
 		assertThat(wrapped.getServerSettings().getHeartbeatFrequency(TimeUnit.MILLISECONDS))
-				.isEqualTo(settings.getServerSettings().getHeartbeatFrequency(TimeUnit.MILLISECONDS));
+			.isEqualTo(settings.getServerSettings().getHeartbeatFrequency(TimeUnit.MILLISECONDS));
 		assertThat(wrapped.getServerSettings().getMinHeartbeatFrequency(TimeUnit.MILLISECONDS))
-				.isEqualTo(settings.getServerSettings().getMinHeartbeatFrequency(TimeUnit.MILLISECONDS));
+			.isEqualTo(settings.getServerSettings().getMinHeartbeatFrequency(TimeUnit.MILLISECONDS));
 		assertThat(wrapped.getApplicationName()).isEqualTo(settings.getApplicationName());
 		assertThat(wrapped.getConnectionPoolSettings().getMaxWaitTime(TimeUnit.MILLISECONDS))
-				.isEqualTo(settings.getConnectionPoolSettings().getMaxWaitTime(TimeUnit.MILLISECONDS));
+			.isEqualTo(settings.getConnectionPoolSettings().getMaxWaitTime(TimeUnit.MILLISECONDS));
 		assertThat(wrapped.getConnectionPoolSettings().getMaxConnectionLifeTime(TimeUnit.MILLISECONDS))
-				.isEqualTo(settings.getConnectionPoolSettings().getMaxConnectionLifeTime(TimeUnit.MILLISECONDS));
+			.isEqualTo(settings.getConnectionPoolSettings().getMaxConnectionLifeTime(TimeUnit.MILLISECONDS));
 		assertThat(wrapped.getConnectionPoolSettings().getMaxConnectionIdleTime(TimeUnit.MILLISECONDS))
-				.isEqualTo(settings.getConnectionPoolSettings().getMaxConnectionIdleTime(TimeUnit.MILLISECONDS));
+			.isEqualTo(settings.getConnectionPoolSettings().getMaxConnectionIdleTime(TimeUnit.MILLISECONDS));
 		assertThat(wrapped.getSslSettings().isEnabled()).isEqualTo(settings.getSslSettings().isEnabled());
 	}
 
@@ -97,7 +98,7 @@ abstract class MongoClientFactorySupportTests<T> {
 	void customizerIsInvoked() {
 		MongoClientSettingsBuilderCustomizer customizer = mock(MongoClientSettingsBuilderCustomizer.class);
 		createMongoClient(customizer);
-		verify(customizer).customize(any(MongoClientSettings.Builder.class));
+		then(customizer).should().customize(any(MongoClientSettings.Builder.class));
 	}
 
 	@Test
@@ -108,10 +109,6 @@ abstract class MongoClientFactorySupportTests<T> {
 		context.refresh();
 		MongoProperties properties = context.getBean(MongoProperties.class);
 		assertThat(properties.isAutoIndexCreation()).isTrue();
-	}
-
-	protected T createMongoClient() {
-		return createMongoClient(null, MongoClientSettings.builder().build());
 	}
 
 	protected T createMongoClient(MongoClientSettings settings) {

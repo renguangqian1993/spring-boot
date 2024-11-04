@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,8 +20,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
-import javax.annotation.PostConstruct;
-
+import org.springframework.beans.factory.InitializingBean;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.StringUtils;
 
@@ -32,10 +31,11 @@ import org.springframework.util.StringUtils;
  * @author Phillip Webb
  * @author Artsiom Yudovin
  * @author MyeongHyeon Lee
+ * @author Moritz Halbritter
  * @since 2.0.0
  */
 @ConfigurationProperties(prefix = "spring.security.oauth2.client")
-public class OAuth2ClientProperties {
+public class OAuth2ClientProperties implements InitializingBean {
 
 	/**
 	 * OAuth provider details.
@@ -55,14 +55,18 @@ public class OAuth2ClientProperties {
 		return this.registration;
 	}
 
-	@PostConstruct
-	public void validate() {
-		getRegistration().values().forEach(this::validateRegistration);
+	@Override
+	public void afterPropertiesSet() {
+		validate();
 	}
 
-	private void validateRegistration(Registration registration) {
+	public void validate() {
+		getRegistration().forEach(this::validateRegistration);
+	}
+
+	private void validateRegistration(String id, Registration registration) {
 		if (!StringUtils.hasText(registration.getClientId())) {
-			throw new IllegalStateException("Client id must not be empty.");
+			throw new IllegalStateException("Client id of registration '%s' must not be empty.".formatted(id));
 		}
 	}
 

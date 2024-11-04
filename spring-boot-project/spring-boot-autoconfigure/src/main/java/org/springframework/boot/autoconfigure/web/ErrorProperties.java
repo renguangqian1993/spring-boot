@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ public class ErrorProperties {
 	/**
 	 * When to include the "trace" attribute.
 	 */
-	private IncludeStacktrace includeStacktrace = IncludeStacktrace.NEVER;
+	private IncludeAttribute includeStacktrace = IncludeAttribute.NEVER;
 
 	/**
 	 * When to include "message" attribute.
@@ -54,6 +54,11 @@ public class ErrorProperties {
 	 * When to include "errors" attribute.
 	 */
 	private IncludeAttribute includeBindingErrors = IncludeAttribute.NEVER;
+
+	/**
+	 * When to include "path" attribute.
+	 */
+	private IncludeAttribute includePath = IncludeAttribute.ALWAYS;
 
 	private final Whitelabel whitelabel = new Whitelabel();
 
@@ -73,11 +78,11 @@ public class ErrorProperties {
 		this.includeException = includeException;
 	}
 
-	public IncludeStacktrace getIncludeStacktrace() {
+	public IncludeAttribute getIncludeStacktrace() {
 		return this.includeStacktrace;
 	}
 
-	public void setIncludeStacktrace(IncludeStacktrace includeStacktrace) {
+	public void setIncludeStacktrace(IncludeAttribute includeStacktrace) {
 		this.includeStacktrace = includeStacktrace;
 	}
 
@@ -95,6 +100,14 @@ public class ErrorProperties {
 
 	public void setIncludeBindingErrors(IncludeAttribute includeBindingErrors) {
 		this.includeBindingErrors = includeBindingErrors;
+	}
+
+	public IncludeAttribute getIncludePath() {
+		return this.includePath;
+	}
+
+	public void setIncludePath(IncludeAttribute includePath) {
+		this.includePath = includePath;
 	}
 
 	public Whitelabel getWhitelabel() {
@@ -117,15 +130,9 @@ public class ErrorProperties {
 		ALWAYS,
 
 		/**
-		 * Add error attribute when the appropriate request parameter is "true".
+		 * Add stacktrace attribute when the appropriate request parameter is not "false".
 		 */
-		ON_PARAM,
-
-		/**
-		 * Add stacktrace information when the "trace" request parameter is "true".
-		 */
-		@Deprecated // since 2.3.0 in favor of {@link #ON_PARAM}
-		ON_TRACE_PARAM;
+		ON_PARAM
 
 	}
 
@@ -145,7 +152,7 @@ public class ErrorProperties {
 		ALWAYS,
 
 		/**
-		 * Add error attribute when the appropriate request parameter is "true".
+		 * Add error attribute when the appropriate request parameter is not "false".
 		 */
 		ON_PARAM
 

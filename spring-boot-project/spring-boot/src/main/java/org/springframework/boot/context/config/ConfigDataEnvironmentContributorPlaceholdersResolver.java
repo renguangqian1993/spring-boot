@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,9 +16,11 @@
 
 package org.springframework.boot.context.config;
 
+import org.springframework.boot.context.config.ConfigDataEnvironmentContributor.Kind;
 import org.springframework.boot.context.properties.bind.PlaceholdersResolver;
 import org.springframework.boot.origin.Origin;
 import org.springframework.boot.origin.OriginLookup;
+import org.springframework.core.convert.ConversionService;
 import org.springframework.core.env.PropertySource;
 import org.springframework.util.PropertyPlaceholderHelper;
 import org.springframework.util.SystemPropertyUtils;
@@ -29,6 +31,7 @@ import org.springframework.util.SystemPropertyUtils;
  *
  * @author Phillip Webb
  * @author Madhura Bhave
+ * @author Moritz Halbritter
  */
 class ConfigDataEnvironmentContributorPlaceholdersResolver implements PlaceholdersResolver {
 
@@ -40,19 +43,27 @@ class ConfigDataEnvironmentContributorPlaceholdersResolver implements Placeholde
 
 	private final PropertyPlaceholderHelper helper;
 
+	private final ConfigDataEnvironmentContributor activeContributor;
+
+	private final ConversionService conversionService;
+
 	ConfigDataEnvironmentContributorPlaceholdersResolver(Iterable<ConfigDataEnvironmentContributor> contributors,
-			ConfigDataActivationContext activationContext, boolean failOnResolveFromInactiveContributor) {
+			ConfigDataActivationContext activationContext, ConfigDataEnvironmentContributor activeContributor,
+			boolean failOnResolveFromInactiveContributor, ConversionService conversionService) {
 		this.contributors = contributors;
 		this.activationContext = activationContext;
+		this.activeContributor = activeContributor;
 		this.failOnResolveFromInactiveContributor = failOnResolveFromInactiveContributor;
+		this.conversionService = conversionService;
 		this.helper = new PropertyPlaceholderHelper(SystemPropertyUtils.PLACEHOLDER_PREFIX,
-				SystemPropertyUtils.PLACEHOLDER_SUFFIX, SystemPropertyUtils.VALUE_SEPARATOR, true);
+				SystemPropertyUtils.PLACEHOLDER_SUFFIX, SystemPropertyUtils.VALUE_SEPARATOR,
+				SystemPropertyUtils.ESCAPE_CHARACTER, true);
 	}
 
 	@Override
 	public Object resolvePlaceholders(Object value) {
-		if (value instanceof String) {
-			return this.helper.replacePlaceholders((String) value, this::resolvePlaceholder);
+		if (value instanceof String string) {
+			return this.helper.replacePlaceholders(string, this::resolvePlaceholder);
 		}
 		return value;
 	}
@@ -62,17 +73,32 @@ class ConfigDataEnvironmentContributorPlaceholdersResolver implements Placeholde
 		for (ConfigDataEnvironmentContributor contributor : this.contributors) {
 			PropertySource<?> propertySource = contributor.getPropertySource();
 			Object value = (propertySource != null) ? propertySource.getProperty(placeholder) : null;
-			if (value != null && !contributor.isActive(this.activationContext)) {
+			if (value != null && !isActive(contributor)) {
 				if (this.failOnResolveFromInactiveContributor) {
+					ConfigDataResource resource = contributor.getResource();
 					Origin origin = OriginLookup.getOrigin(propertySource, placeholder);
-					throw new InactiveConfigDataAccessException(propertySource, contributor.getLocation(), placeholder,
-							origin);
+					throw new InactiveConfigDataAccessException(propertySource, resource, placeholder, origin);
 				}
 				value = null;
 			}
 			result = (result != null) ? result : value;
 		}
-		return (result != null) ? String.valueOf(result) : null;
+		return (result != null) ? convertValueIfNecessary(result) : null;
+	}
+
+	private boolean isActive(ConfigDataEnvironmentContributor contributor) {
+		if (contributor == this.activeContributor) {
+			return true;
+		}
+		if (contributor.getKind() != Kind.UNBOUND_IMPORT) {
+			return contributor.isActive(this.activationContext);
+		}
+		return contributor.withBoundProperties(this.contributors, this.activationContext)
+			.isActive(this.activationContext);
+	}
+
+	private String convertValueIfNecessary(Object value) {
+		return (value instanceof String string) ? string : this.conversionService.convert(value, String.class);
 	}
 
 }

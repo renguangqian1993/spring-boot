@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException
  * Tests for {@link ZipFileTarArchive}.
  *
  * @author Phillip Webb
+ * @author Scott Frederick
  */
 class ZipFileTarArchiveTests {
 
@@ -45,7 +46,7 @@ class ZipFileTarArchiveTests {
 	@Test
 	void createWhenZipIsNullThrowsException() {
 		assertThatIllegalArgumentException().isThrownBy(() -> new ZipFileTarArchive(null, Owner.ROOT))
-				.withMessage("Zip must not be null");
+			.withMessage("Zip must not be null");
 	}
 
 	@Test
@@ -53,7 +54,7 @@ class ZipFileTarArchiveTests {
 		File file = new File(this.tempDir, "test.zip");
 		writeTestZip(file);
 		assertThatIllegalArgumentException().isThrownBy(() -> new ZipFileTarArchive(file, null))
-				.withMessage("Owner must not be null");
+			.withMessage("Owner must not be null");
 	}
 
 	@Test
@@ -66,15 +67,16 @@ class ZipFileTarArchiveTests {
 		tarArchive.writeTo(outputStream);
 		try (TarArchiveInputStream tarStream = new TarArchiveInputStream(
 				new ByteArrayInputStream(outputStream.toByteArray()))) {
-			TarArchiveEntry dirEntry = tarStream.getNextTarEntry();
+			TarArchiveEntry dirEntry = tarStream.getNextEntry();
 			assertThat(dirEntry.getName()).isEqualTo("spring/");
 			assertThat(dirEntry.getLongUserId()).isEqualTo(123);
 			assertThat(dirEntry.getLongGroupId()).isEqualTo(456);
-			TarArchiveEntry fileEntry = tarStream.getNextTarEntry();
+			TarArchiveEntry fileEntry = tarStream.getNextEntry();
 			assertThat(fileEntry.getName()).isEqualTo("spring/boot");
 			assertThat(fileEntry.getLongUserId()).isEqualTo(123);
 			assertThat(fileEntry.getLongGroupId()).isEqualTo(456);
 			assertThat(fileEntry.getSize()).isEqualTo(4);
+			assertThat(fileEntry.getMode()).isEqualTo(0755);
 			assertThat(tarStream).hasContent("test");
 		}
 	}
@@ -85,6 +87,7 @@ class ZipFileTarArchiveTests {
 			zip.putArchiveEntry(dirEntry);
 			zip.closeArchiveEntry();
 			ZipArchiveEntry fileEntry = new ZipArchiveEntry("spring/boot");
+			fileEntry.setUnixMode(0755);
 			zip.putArchiveEntry(fileEntry);
 			zip.write("test".getBytes(StandardCharsets.UTF_8));
 			zip.closeArchiveEntry();

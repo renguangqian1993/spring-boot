@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2023 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,14 +35,29 @@ public abstract class DataObjectPropertyName {
 	 * @return the dashed from
 	 */
 	public static String toDashedForm(String name) {
-		StringBuilder result = new StringBuilder();
-		String replaced = name.replace('_', '-');
-		for (int i = 0; i < replaced.length(); i++) {
-			char ch = replaced.charAt(i);
-			if (Character.isUpperCase(ch) && result.length() > 0 && result.charAt(result.length() - 1) != '-') {
-				result.append('-');
+		StringBuilder result = new StringBuilder(name.length());
+		boolean inIndex = false;
+		for (int i = 0; i < name.length(); i++) {
+			char ch = name.charAt(i);
+			if (inIndex) {
+				result.append(ch);
+				if (ch == ']') {
+					inIndex = false;
+				}
 			}
-			result.append(Character.toLowerCase(ch));
+			else {
+				if (ch == '[') {
+					inIndex = true;
+					result.append(ch);
+				}
+				else {
+					ch = (ch != '_') ? ch : '-';
+					if (Character.isUpperCase(ch) && !result.isEmpty() && result.charAt(result.length() - 1) != '-') {
+						result.append('-');
+					}
+					result.append(Character.toLowerCase(ch));
+				}
+			}
 		}
 		return result.toString();
 	}

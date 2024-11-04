@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2020 the original author or authors.
+ * Copyright 2012-2024 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,7 @@ import org.gradle.api.attributes.Usage;
 import org.gradle.api.plugins.JavaPlugin;
 import org.gradle.api.plugins.JavaPluginExtension;
 import org.gradle.api.publish.PublishingExtension;
+import org.gradle.api.publish.VariantVersionMappingStrategy;
 import org.gradle.api.publish.maven.MavenPom;
 import org.gradle.api.publish.maven.MavenPomDeveloperSpec;
 import org.gradle.api.publish.maven.MavenPomIssueManagement;
@@ -30,6 +31,11 @@ import org.gradle.api.publish.maven.MavenPomOrganization;
 import org.gradle.api.publish.maven.MavenPomScm;
 import org.gradle.api.publish.maven.MavenPublication;
 import org.gradle.api.publish.maven.plugins.MavenPublishPlugin;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import org.springframework.boot.build.properties.BuildProperties;
+import org.springframework.boot.build.properties.BuildType;
 
 /**
  * Conventions that are applied in the presence of the {@link MavenPublishPlugin}. When
@@ -49,13 +55,13 @@ import org.gradle.api.publish.maven.plugins.MavenPublishPlugin;
  * </ul>
  * </ul>
  *
- * <p/>
- *
  * @author Andy Wilkinson
  * @author Christoph Dreis
  * @author Mike Smithson
  */
 class MavenPublishingConventions {
+
+	private static final Logger logger = LoggerFactory.getLogger(MavenPublishingConventions.class);
 
 	void apply(Project project) {
 		project.getPlugins().withType(MavenPublishPlugin.class).all((mavenPublish) -> {
@@ -66,8 +72,9 @@ class MavenPublishingConventions {
 					mavenRepository.setName("deployment");
 				});
 			}
-			publishing.getPublications().withType(MavenPublication.class)
-					.all((mavenPublication) -> customizeMavenPublication(mavenPublication, project));
+			publishing.getPublications()
+				.withType(MavenPublication.class)
+				.all((mavenPublication) -> customizeMavenPublication(mavenPublication, project));
 			project.getPlugins().withType(JavaPlugin.class).all((javaPlugin) -> {
 				JavaPluginExtension extension = project.getExtensions().getByType(JavaPluginExtension.class);
 				extension.withJavadocJar();
@@ -78,8 +85,9 @@ class MavenPublishingConventions {
 
 	private void customizeMavenPublication(MavenPublication publication, Project project) {
 		customizePom(publication.getPom(), project);
-		project.getPlugins().withType(JavaPlugin.class)
-				.all((javaPlugin) -> customizeJavaMavenPublication(publication, project));
+		project.getPlugins()
+			.withType(JavaPlugin.class)
+			.all((javaPlugin) -> customizeJavaMavenPublication(publication, project));
 	}
 
 	private void customizePom(MavenPom pom, Project project) {
@@ -92,20 +100,18 @@ class MavenPublishingConventions {
 		pom.licenses(this::customizeLicences);
 		pom.developers(this::customizeDevelopers);
 		pom.scm((scm) -> customizeScm(scm, project));
-		if (!isUserInherited(project)) {
-			pom.issueManagement(this::customizeIssueManagement);
-		}
+		pom.issueManagement((issueManagement) -> customizeIssueManagement(issueManagement, project));
 	}
 
 	private void customizeJavaMavenPublication(MavenPublication publication, Project project) {
 		publication.versionMapping((strategy) -> strategy.usage(Usage.JAVA_API, (mappingStrategy) -> mappingStrategy
-				.fromResolutionOf(JavaPlugin.RUNTIME_CLASSPATH_CONFIGURATION_NAME)));
-		publication.versionMapping((strategy) -> strategy.usage(Usage.JAVA_RUNTIME,
-				(mappingStrategy) -> mappingStrategy.fromResolutionResult()));
+			.fromResolutionOf(JavaPlugin.RUNTIME_CLASSPATH_CONFIGURATION_NAME)));
+		publication.versionMapping(
+				(strategy) -> strategy.usage(Usage.JAVA_RUNTIME, VariantVersionMappingStrategy::fromResolutionResult));
 	}
 
 	private void customizeOrganization(MavenPomOrganization organization) {
-		organization.getName().set("Pivotal Software, Inc.");
+		organization.getName().set("VMware, Inc.");
 		organization.getUrl().set("https://spring.io");
 	}
 
@@ -118,24 +124,34 @@ class MavenPublishingConventions {
 
 	private void customizeDevelopers(MavenPomDeveloperSpec developers) {
 		developers.developer((developer) -> {
-			developer.getName().set("Pivotal");
-			developer.getEmail().set("info@pivotal.io");
-			developer.getOrganization().set("Pivotal Software, Inc.");
+			developer.getName().set("Spring");
+			developer.getEmail().set("ask@spring.io");
+			developer.getOrganization().set("VMware, Inc.");
 			developer.getOrganizationUrl().set("https://www.spring.io");
 		});
 	}
 
 	private void customizeScm(MavenPomScm scm, Project project) {
+		if (BuildProperties.get(project).buildType() != BuildType.OPEN_SOURCE) {
+			logger.debug("Skipping Maven POM SCM for non open source build type");
+			return;
+		}
+		scm.getUrl().set("https://github.com/spring-projects/spring-boot");
 		if (!isUserInherited(project)) {
 			scm.getConnection().set("scm:git:git://github.com/spring-projects/spring-boot.git");
 			scm.getDeveloperConnection().set("scm:git:ssh://git@github.com/spring-projects/spring-boot.git");
 		}
-		scm.getUrl().set("https://github.com/spring-projects/spring-boot");
 	}
 
-	private void customizeIssueManagement(MavenPomIssueManagement issueManagement) {
-		issueManagement.getSystem().set("GitHub");
-		issueManagement.getUrl().set("https://github.com/spring-projects/spring-boot/issues");
+	private void customizeIssueManagement(MavenPomIssueManagement issueManagement, Project project) {
+		if (BuildProperties.get(project).buildType() != BuildType.OPEN_SOURCE) {
+			logger.debug("Skipping Maven POM SCM for non open source build type");
+			return;
+		}
+		if (!isUserInherited(project)) {
+			issueManagement.getSystem().set("GitHub");
+			issueManagement.getUrl().set("https://github.com/spring-projects/spring-boot/issues");
+		}
 	}
 
 	private boolean isUserInherited(Project project) {
